@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1448" viewBox="0 0 1024 1448">
+  <defs>
+    <linearGradient id="cardBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#210405"/>
+      <stop offset="0.48" stop-color="#070102"/>
+      <stop offset="1" stop-color="#681116"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="72%" cy="18%" r="80%">
+      <stop offset="0" stop-color="#ff9b86" stop-opacity="0.32"/>
+      <stop offset="0.46" stop-color="#e52c30" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#060203" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1024" height="1448" rx="78" fill="url(#cardBg)"/>
+  <rect width="1024" height="1448" rx="78" fill="url(#glow)"/>
+  <circle cx="512" cy="98" r="34" fill="#050101" stroke="#ffffff" stroke-opacity="0.32" stroke-width="4"/>
+  <circle cx="512" cy="98" r="14" fill="#ffffff" fill-opacity="0.34"/>
+
+  <text x="84" y="246" fill="#ff9b86" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="800" letter-spacing="8">CREATOR CARD</text>
+  <text x="84" y="360" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="74" font-weight="800">Gong Yueyue</text>
+  <text x="84" y="432" fill="#ffffff" fill-opacity="0.66" font-family="'Noto Sans SC', Arial, sans-serif" font-size="36">龚玥月 / Emore</text>
+  <rect x="84" y="520" width="856" height="3" fill="#ffffff" fill-opacity="0.18"/>
+
+  <text x="84" y="642" fill="#ffffff" font-family="'Noto Serif SC', 'Songti SC', serif" font-size="54" font-weight="800">创作简介</text>
+  <text x="84" y="746" fill="#ffffff" fill-opacity="0.74" font-family="'Noto Sans SC', Arial, sans-serif" font-size="36">以未来文明、神秘仪式与异域空间</text>
+  <text x="84" y="812" fill="#ffffff" fill-opacity="0.74" font-family="'Noto Sans SC', Arial, sans-serif" font-size="36">为视觉母题，完成叙事世界观、</text>
+  <text x="84" y="878" fill="#ffffff" fill-opacity="0.74" font-family="'Noto Sans SC', Arial, sans-serif" font-size="36">角色造型和场景概念的整合表达。</text>
+
+  <rect x="84" y="1002" width="856" height="254" rx="34" fill="#ffffff" fill-opacity="0.046" stroke="#ffffff" stroke-opacity="0.13"/>
+  <text x="124" y="1084" fill="#ff9b86" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="800" letter-spacing="6">FOCUS</text>
+  <text x="124" y="1156" fill="#ffffff" fill-opacity="0.76" font-family="'Noto Sans SC', Arial, sans-serif" font-size="34">AI 影像短片 / 场景设计 / 人物造型</text>
+  <text x="124" y="1220" fill="#ffffff" fill-opacity="0.76" font-family="'Noto Sans SC', Arial, sans-serif" font-size="34">创意设计 / 综合视觉表达</text>
+
+  <text x="84" y="1370" fill="#ffffff" fill-opacity="0.5" font-family="Inter, Arial, sans-serif" font-size="28">Midjourney / Runway / Blender / AE / Nuke</text>
+</svg>
