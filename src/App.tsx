@@ -563,17 +563,31 @@ function App() {
   }
 
   useEffect(() => {
-    const handlePopState = () => setViewMode(getInitialViewMode())
+    const handlePopState = () => {
+      setViewMode(getInitialViewMode())
+      setMenuOpen(false)
+    }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
+
+  useEffect(() => {
+    if (!menuOpen) {
+      document.body.style.overflow = ''
+      return
+    }
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [menuOpen])
 
   return (
     <ClickSpark>
       <main className={`portfolio-shell portfolio-${viewMode} min-h-screen overflow-x-hidden bg-[#060203] text-white`} data-view-mode={viewMode}>
       <Navigation menuOpen={menuOpen} setMenuOpen={setMenuOpen} viewMode={viewMode} onViewModeChange={handleViewModeChange} />
 
-      {page === 'home' && <section id="home" ref={heroRef} className="hero-shell relative min-h-[100dvh] overflow-hidden">
+      {page === 'home' && <section id="home" ref={heroRef} className="hero-shell relative min-h-[100dvh] overflow-clip">
         <BackgroundVideo src="/assets/home-bottom-video-no-subtitles.mp4" poster="/assets/stills/residual-altar.webp" />
         <div className="hero-frost-layer" aria-hidden="true" />
         <div className="hero-clarity-ring" aria-hidden="true" />
@@ -1028,14 +1042,11 @@ function Navigation({
           type="button"
           onClick={() => {
             if (!menuOpen) {
-              const y = window.scrollY
-              document.body.dataset.menuScroll = String(y)
-              document.body.style.overflow = 'hidden'
+              document.body.dataset.menuScroll = String(window.scrollY)
               setMenuOpen(true)
               return
             }
             const y = Number(document.body.dataset.menuScroll || '0')
-            document.body.style.overflow = ''
             delete document.body.dataset.menuScroll
             setMenuOpen(false)
             window.scrollTo(0, y)
@@ -1055,7 +1066,6 @@ function Navigation({
             end={item.to === '/'}
             key={item.label}
             onClick={() => {
-              document.body.style.overflow = ''
               delete document.body.dataset.menuScroll
               setMenuOpen(false)
             }}
@@ -1070,7 +1080,6 @@ function Navigation({
           href="/assets/docs/gong-yueyue-portfolio.pdf"
           download
           onClick={() => {
-            document.body.style.overflow = ''
             delete document.body.dataset.menuScroll
             setMenuOpen(false)
           }}

@@ -322,6 +322,7 @@ button {
 }
 
 .hero-shell {
+  overflow: clip;
   --hero-video-x: 0px;
   --hero-video-y: 0px;
   --hero-field-x: 0px;
