@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Eye,
   Film,
-  Mail,
   Menu,
   Sparkles,
   User,
@@ -13,6 +12,8 @@ import {
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+import { layoutSample } from './layoutSample'
 import GhostCursor from './components/GhostCursor/GhostCursor'
 import Lanyard from './components/Lanyard/Lanyard'
 import LiquidEther from './components/LiquidEther/LiquidEther'
@@ -45,11 +46,13 @@ type Spark = {
 type ViewMode = 'desktop' | 'mobile'
 
 const navItems = [
-  { label: '首页', href: '#home' },
-  { label: '短片作品', href: '#films' },
-  { label: '场景设计', href: '#scenes' },
-  { label: '人物造型', href: '#characters' },
-  { label: '创意设计', href: '#creative' },
+  { label: '首页', to: '/' },
+  { label: '关于', to: '/about' },
+  { label: '项目', to: '/projects' },
+  { label: '影片', to: '/films' },
+  { label: '场景', to: '/scenes' },
+  { label: '人物', to: '/characters' },
+  { label: '文章', to: '/articles' },
 ]
 
 const canvaAsset = (group: 'film' | 'scene' | 'character' | 'creative', file: string) =>
@@ -513,7 +516,7 @@ function useHeroParallax() {
   return ref
 }
 
-function useReveal() {
+function useReveal(pageKey: string) {
   useEffect(() => {
     const elements = Array.from(document.querySelectorAll<HTMLElement>('.reveal'))
     if (!elements.length) return
@@ -532,7 +535,7 @@ function useReveal() {
 
     elements.forEach((element) => observer.observe(element))
     return () => observer.disconnect()
-  }, [])
+  }, [pageKey])
 }
 
 function App() {
@@ -542,8 +545,10 @@ function App() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [activeWork, setActiveWork] = useState<WorkItem | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode)
+  const { pathname } = useLocation()
+  const page = pathname === '/' ? 'home' : pathname.slice(1)
   const heroRef = useHeroParallax()
-  useReveal()
+  useReveal(pathname)
 
   const currentStill = stills[activeStill]
 
@@ -568,7 +573,7 @@ function App() {
       <main className={`portfolio-shell portfolio-${viewMode} min-h-screen overflow-x-hidden bg-[#060203] text-white`} data-view-mode={viewMode}>
       <Navigation menuOpen={menuOpen} setMenuOpen={setMenuOpen} viewMode={viewMode} onViewModeChange={handleViewModeChange} />
 
-      <section id="home" ref={heroRef} className="hero-shell relative min-h-[100dvh] overflow-hidden">
+      {page === 'home' && <section id="home" ref={heroRef} className="hero-shell relative min-h-[100dvh] overflow-hidden">
         <BackgroundVideo src="/assets/home-bottom-video-no-subtitles.mp4" poster="/assets/stills/residual-altar.webp" />
         <div className="hero-frost-layer" aria-hidden="true" />
         <div className="hero-clarity-ring" aria-hidden="true" />
@@ -617,9 +622,9 @@ function App() {
               </h1>
 
               <div className="animate-blur-fade-up hero-actions mt-8 flex flex-wrap gap-3 sm:gap-4" style={{ animationDelay: '650ms' }}>
-                <a className="primary-button" href="#films">
+                <Link className="primary-button" to="/films">
                   查看作品 <ArrowRight size={18} />
-                </a>
+                </Link>
                 <button className="liquid-glass glass-button" type="button" onClick={() => setProfileOpen(true)}>
                   个人简介 <User size={18} />
                 </button>
@@ -630,10 +635,9 @@ function App() {
             </div>
           </div>
         </div>
-        <ProfileLanyard open={profileOpen} onClose={() => setProfileOpen(false)} />
-      </section>
+      </section>}
 
-      <section className="relative z-10 border-y border-white/8 bg-[#060203] px-4 py-8 sm:px-6 md:px-12">
+      {page === 'home' && <section className="relative z-10 border-y border-white/8 bg-[#060203] px-4 py-8 sm:px-6 md:px-12">
         <div className="summary-strip-grid mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4">
           {sectionSummaries.map(([title, summary], index) => (
             <div
@@ -648,8 +652,11 @@ function App() {
             </div>
           ))}
         </div>
-      </section>
+      </section>}
 
+      {page === 'films' && <YoutubeSample />}
+
+      {page === 'films' && <>
       <section id="films" className="section-block bg-[#100507]">
         <SectionMotionLayer image="/assets/stills/red-throne.webp" variant="film" />
         <div className="mx-auto max-w-[1400px]">
@@ -703,8 +710,9 @@ function App() {
           </div>
         </div>
       </section>
+      </>}
 
-      <section id="scenes" className="section-block bg-[#100507]">
+      {page === 'scenes' && <section id="scenes" className="section-block bg-[#100507]">
         <SectionMotionLayer image="/assets/stills/dark-red-marsh.webp" variant="scene" />
         <div className="mx-auto max-w-[1400px]">
           <SectionHeader title="场景设计" body="通过 AI 场景生成、舞台效果图、模型和手绘训练，建立可叙事的空间系统。" />
@@ -757,9 +765,9 @@ function App() {
             ))}
           </div>
         </div>
-      </section>
+      </section>}
 
-      <section id="characters" className="section-block bg-[#0a0304]">
+      {page === 'characters' && <section id="characters" className="section-block bg-[#0a0304]">
         <SectionMotionLayer image={characterAssetGroups.styling[0]} variant="character" />
         <div className="mx-auto max-w-[1400px]">
           <SectionHeader title="人物造型" body="从历史服化道到特效妆面，从戏剧人物到民族妆造，强调角色身份与影像质感。" />
@@ -779,9 +787,9 @@ function App() {
             </div>
           </div>
         </div>
-      </section>
+      </section>}
 
-      <section id="creative" className="section-block bg-[#100507]">
+      {page === 'projects' && <section id="creative" className="section-block bg-[#100507]">
         <SectionMotionLayer image={creativeAssetGroups.collaboration[0]} variant="creative" />
         <div className="mx-auto max-w-[1400px]">
           <SectionHeader title="创意设计" body="把软件能力转化为风格表达，覆盖动态海报、视效合成、Blender 场景和跨媒介创作。" />
@@ -804,7 +812,36 @@ function App() {
             </div>
           </div>
         </div>
-      </section>
+      </section>}
+
+      {page === 'about' && (
+        <section className="section-block bg-[#100507]">
+          <div className="mx-auto max-w-[1400px]">
+            <SectionHeader title="关于" body="龚玥月 / Emore。影像美术、AI 短片、人物造型与创意设计。" />
+            <div className="mt-8">
+              <button className="liquid-glass glass-button" type="button" onClick={() => setProfileOpen(true)}>
+                个人简介 <User size={18} />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {page === 'articles' && (
+        <section className="section-block bg-[#0a0304]">
+          <div className="mx-auto max-w-[1400px]">
+            <SectionHeader title="文章" body="这里还没有文章。" />
+          </div>
+        </section>
+      )}
+
+      {page === 'missing' && (
+        <section className="section-block bg-[#0a0304]">
+          <div className="mx-auto max-w-[1400px]">
+            <SectionHeader title="没有这一页" body="从顶部导航回到已有栏目。" />
+          </div>
+        </section>
+      )}
 
       <footer className="border-t border-white/8 bg-[#060203] px-4 py-10 sm:px-6 md:px-12">
         <div className="mx-auto flex max-w-[1400px] flex-col gap-6 md:flex-row md:items-center md:justify-between">
@@ -813,9 +850,6 @@ function App() {
             <p className="mt-2 text-sm text-white/52">影像美术 / AI 短片 / 人物造型 / 创意设计</p>
           </div>
           <div className="flex flex-wrap gap-3 text-sm text-white/62">
-            <a className="footer-link" href="mailto:383158353@qq.com">
-              <Mail size={16} /> 383158353@qq.com
-            </a>
             <span className="footer-link">
               <User size={16} /> 重庆大学美视电影学院
             </span>
@@ -823,6 +857,7 @@ function App() {
         </div>
       </footer>
 
+      <ProfileLanyard open={profileOpen} onClose={() => setProfileOpen(false)} />
       {lightbox && <Lightbox item={lightbox} onClose={() => setLightbox(null)} />}
       {activeWork && <WorkDetailModal item={activeWork} onClose={() => setActiveWork(null)} onPreview={setLightbox} />}
       </main>
@@ -959,20 +994,23 @@ function Navigation({
   return (
     <header className="fixed left-0 right-0 top-0 z-50 px-4 py-4 sm:px-6 md:px-12">
       <nav className="liquid-glass nav-shell mx-auto flex h-14 max-w-[1400px] items-center justify-between px-4">
-        <a className="animate-blur-fade-up text-sm font-semibold tracking-[0.14em] text-white" href="#home" style={{ animationDelay: '0ms' }}>
+        <Link className="animate-blur-fade-up text-sm font-semibold tracking-[0.14em] text-white" to="/" style={{ animationDelay: '0ms' }}>
           GONG YUEYUE / EMORE
-        </a>
+        </Link>
 
-        <div className="desktop-nav-links hidden items-center gap-7 lg:flex">
+        <div className="desktop-nav-links hidden items-center gap-4 lg:flex">
           {navItems.map((item, index) => (
-            <a
-              className="animate-blur-fade-up text-base text-white/74 transition-colors hover:text-[var(--accent)]"
-              href={item.href}
+            <NavLink
+              className={({ isActive }) =>
+                `animate-blur-fade-up text-sm transition-colors hover:text-[var(--accent)] ${isActive ? 'text-white' : 'text-white/74'}`
+              }
+              end={item.to === '/'}
               key={item.label}
               style={{ animationDelay: `${100 + index * 45}ms` }}
+              to={item.to}
             >
               {item.label}
-            </a>
+            </NavLink>
           ))}
         </div>
 
@@ -980,9 +1018,6 @@ function Navigation({
           <VersionSwitch viewMode={viewMode} onViewModeChange={onViewModeChange} />
           <a className="animate-blur-fade-up liquid-glass nav-action" href="/assets/docs/gong-yueyue-portfolio.pdf" download style={{ animationDelay: '380ms' }}>
             <ArrowDownToLine size={17} /> 下载作品集
-          </a>
-          <a className="animate-blur-fade-up liquid-glass nav-circle" href="mailto:383158353@qq.com" aria-label="联系" style={{ animationDelay: '430ms' }}>
-            <Mail size={17} />
           </a>
         </div>
 
@@ -1001,15 +1036,39 @@ function Navigation({
       <div className={`mobile-menu ${menuOpen ? 'is-open' : ''}`}>
         <VersionSwitch viewMode={viewMode} onViewModeChange={onViewModeChange} compact />
         {navItems.map((item, index) => (
-          <a href={item.href} key={item.label} onClick={() => setMenuOpen(false)} style={{ transitionDelay: `${index * 45}ms` }}>
+          <NavLink end={item.to === '/'} key={item.label} onClick={() => setMenuOpen(false)} style={{ transitionDelay: `${index * 45}ms` }} to={item.to}>
             {item.label}
-          </a>
+          </NavLink>
         ))}
         <a className="mobile-download-link" href="/assets/docs/gong-yueyue-portfolio.pdf" download onClick={() => setMenuOpen(false)}>
           下载作品集
         </a>
       </div>
     </header>
+  )
+}
+
+function YoutubeSample() {
+  return (
+    <section className="section-block bg-[#0a0304]" data-layout-sample="true">
+      <div className="mx-auto max-w-[1400px]">
+        <SectionHeader title={layoutSample.label} body={layoutSample.note} />
+        <div className="yt-frame mt-8">
+          <iframe
+            src={layoutSample.embedUrl}
+            title={layoutSample.label}
+            allow="fullscreen; encrypted-media; picture-in-picture"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+        <p className="mt-4">
+          <a className="footer-link" href={layoutSample.watchUrl} target="_blank" rel="noreferrer">
+            在 YouTube 打开
+          </a>
+        </p>
+      </div>
+    </section>
   )
 }
 

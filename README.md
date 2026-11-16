@@ -5,19 +5,26 @@ Red and black personal portfolio website for Gong Yueyue / Emore, built with Rea
 ## Local Development
 
 ```bash
-npm install
-npm run dev
+pnpm install --frozen-lockfile
+pnpm run dev
 ```
 
 Open the local URL printed by Vite, usually `http://127.0.0.1:5173/`.
 
-## Build
+## Build and test
 
 ```bash
-npm run build
+pnpm run build
+pnpm test
 ```
 
-The production build is written to `dist/`.
+The production build is written to `dist/`. `vercel.json` sends other paths back to `index.html`, so the seven routes can be opened directly.
+
+## What changed from 7745266
+
+The visual system, work cards, stills, and the original homepage video plus 《剩余维度》 trailer stay in place. The top navigation is now seven routes: 首页、关于、项目、影片、场景、人物、文章. 影片 keeps the original trailer and adds one labeled test embed, plus a link to the same video on YouTube. The page does not decide whether that embed is actually playing. 关于 uses the existing name and the existing profile card. 文章 is empty. Email is not shown.
+
+Original media stays in Git LFS. Locally, `git lfs pull` produced real files: the homepage video is 139615417 bytes and 66.85 seconds, the trailer is 165991229 bytes and 85.22 seconds, and `residual-dimension.mp4` is 9964759 bytes and 70.33 seconds. These files are not replaced with still images.
 
 ## Large Assets
 
