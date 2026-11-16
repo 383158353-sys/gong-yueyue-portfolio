@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
+import BoardRoute from './editor/BoardRoute'
+import EditorRoute from './editor/EditorRoute'
 import { layoutSample } from './layoutSample'
 import GhostCursor from './components/GhostCursor/GhostCursor'
 import Lanyard from './components/Lanyard/Lanyard'
@@ -581,6 +583,9 @@ function App() {
       document.body.style.overflow = ''
     }
   }, [menuOpen])
+
+  if (pathname === '/editor') return <EditorRoute />
+  if (pathname === '/board') return <BoardRoute />
 
   return (
     <ClickSpark>
