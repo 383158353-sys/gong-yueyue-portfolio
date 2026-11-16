@@ -76,6 +76,7 @@ export function createEmbedUrl(videoId: string): string | null {
     rel: '0',
     modestbranding: '1',
     playsinline: '1',
+    autoplay: '0',
   })
   return `${EMBED_ORIGIN}/embed/${encodeURIComponent(videoId)}?${params.toString()}`
 }

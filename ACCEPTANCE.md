@@ -43,3 +43,14 @@
 Vercel 连接 `list_projects(search=portfolio)` 返回 403。当前连接没有 `emeng/team_vFyuSSNncW4qMnQUQGGkcZkG` 的访问权。按实测结论，这次没有重试 emeng，没有调用 Vercel CLI，没有新建项目或付费资源，也没有读取凭据。
 
 代码可以在本地构建和预览。线上还没有地址，需要恢复该团队授权之后才能做独立预览。本文件写完时还没有可访问的生产或预览 URL。
+
+## 2026-11-16 影片嵌入示例
+
+用户澄清：先用一个 YouTube 视频看嵌入位置和排版，以后把自己的片子传到 YouTube 再替换。这一轮没有做管理后台、上传、多人同步或导出后发布。
+
+- 影片页顶部直接嵌入 `M7lc1UVf-VE`，标题为「测试视频，非本人作品；待替换」。
+- 地址写在 `src/content/layoutExample.json`，不在作品条目里。
+- iframe 域名是 `youtube-nocookie.com`，`autoplay=0`。
+- 作品静帧和「YouTube 链接待补」保持原样。
+- 本机草稿表单仍只保存在当前浏览器，不是公开发布。
+- 部署状态不变：没有线上 URL，没有重试 Vercel。

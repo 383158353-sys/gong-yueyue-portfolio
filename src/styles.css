@@ -233,6 +233,16 @@ figcaption strong {
   font-size: 13px;
 }
 
+.layout-example {
+  max-width: 880px;
+  margin: 8px 0 72px;
+}
+
+.layout-example h2 {
+  font-size: 1.15rem;
+  letter-spacing: 0;
+}
+
 .local-tool,
 .functional-test {
   max-width: 880px;
@@ -293,6 +303,7 @@ a + button {
   width: 100%;
   aspect-ratio: 16 / 9;
   background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.28);
 }
 
 .embed-host,

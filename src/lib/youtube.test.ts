@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import layoutExample from '../content/layoutExample.json'
+import { films } from '../content/catalog'
 import {
   EMBED_ORIGIN,
   FUNCTIONAL_TEST_VIDEO_ID,
@@ -58,7 +60,8 @@ describe('extractYouTubeId', () => {
 describe('createEmbedUrl', () => {
   it('stays on the nocookie whitelist', () => {
     const url = createEmbedUrl('M7lc1UVf-VE')
-    expect(url).toBe(`${EMBED_ORIGIN}/embed/M7lc1UVf-VE?rel=0&modestbranding=1&playsinline=1`)
+    expect(url).toBe(`${EMBED_ORIGIN}/embed/M7lc1UVf-VE?rel=0&modestbranding=1&playsinline=1&autoplay=0`)
+    expect(url?.includes('autoplay=1')).toBe(false)
     expect(url?.includes('youtube.com/embed')).toBe(false)
     expect(createEmbedUrl('../etc/passwd')).toBeNull()
     expect(createEmbedUrl('M7lc1UVf-VE</iframe><script>')).toBeNull()
@@ -135,6 +138,14 @@ describe('local library', () => {
       allowedFilmIds: FILMS,
     })
     expect(removeLocalEntry(added.entries, 'bbbbbbbbbbb')).toEqual([])
+  })
+})
+
+describe('layout example', () => {
+  it('is the official sample and is not filed as a real work', () => {
+    expect(layoutExample.videoId).toBe(FUNCTIONAL_TEST_VIDEO_ID)
+    expect(layoutExample.label).toBe('测试视频，非本人作品；待替换')
+    expect(films.some((film) => film.title.includes('测试视频') || film.summary.includes(FUNCTIONAL_TEST_VIDEO_ID))).toBe(false)
   })
 })
 

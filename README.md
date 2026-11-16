@@ -29,13 +29,11 @@ npm run preview
 
 ## 影片
 
-公开作品都没有 YouTube 地址，页面写明「待补」。大视频和 40 页作品集 PDF 在 Git 里是 LFS 指针，这个环境不能播放，页面也不把它们当成已经可播的文件。
+影片页最上方有一个 16:9 的 YouTube iframe，用来看嵌入位置和排版。视频是 YouTube IFrame Player API 文档里的公开示例 `M7lc1UVf-VE`，页面标题写明「测试视频，非本人作品；待替换」。它不放进任何作品条目。换成自己的片子时，只改 `src/content/layoutExample.json` 里的 `videoId`。页面没有在线编辑后自动发布。
 
-可以在影片页粘贴 `watch`、`youtu.be`、`shorts`、`embed` 链接。脚本只抽出 11 位视频 ID，iframe 固定在 `https://www.youtube-nocookie.com/embed/`。用户输入不会被当成 HTML 渲染。
+iframe 使用 `https://www.youtube-nocookie.com/embed/`，参数含 `autoplay=0`，不会自动播放。作品静帧仍在播放器下面。这些片子还没有作者自己的 YouTube 地址，页面继续标成待补。大视频和 40 页作品集 PDF 是 Git LFS 指针，不能当作成片播放。
 
-这些链接写在当前浏览器的 `localStorage`（键名 `gong-yueyue-local-youtube-v1`）。刷新还在；换设备、换浏览器或清站点数据就没有。不会上传，其他访客看不到。
-
-YouTube IFrame Player API 文档里的公开示例片 `M7lc1UVf-VE` 只放在「嵌入功能测试」里，用来检查播放器。它不是龚玥月的作品，不能写入本机作品库，也不会挂到公开作品上。远程播放若没有收到 YouTube 的播放或错误状态，页面保持「尚未确认」，并给出原视频链接。
+本机仍可以粘贴 `watch`、`youtu.be`、`shorts`、`embed` 链接做预览。脚本只抽出 11 位视频 ID，不把用户输入当成 HTML。链接写在当前浏览器的 `localStorage`（键名 `gong-yueyue-local-youtube-v1`），不会上传，其他访客看不到，也不是公开发布。测试片不能写进这份本机列表。远程播放若没有收到 YouTube 的播放或错误状态，页面保持「尚未确认」。
 
 ## 复用
 

@@ -113,6 +113,20 @@ try {
     flow.click('header nav a[href="/films"]'),
   ])
   console.log('youtube: films open')
+  await flow.waitForSelector('[data-layout-example] iframe')
+  const layoutLabel = await flow.$eval('#layout-example-heading', (node) => node.textContent?.trim() || '')
+  if (layoutLabel !== '测试视频，非本人作品；待替换') fail(`layout label: ${layoutLabel}`)
+  const layoutSrcEarly = await flow.$eval('[data-layout-example] iframe', (node) => node.getAttribute('src') || '')
+  if (!layoutSrcEarly.startsWith('https://www.youtube-nocookie.com/embed/M7lc1UVf-VE')) fail(`layout src ${layoutSrcEarly}`)
+  if (!layoutSrcEarly.includes('autoplay=0') || layoutSrcEarly.includes('autoplay=1')) fail(`layout autoplay ${layoutSrcEarly}`)
+  const desktopFrame = await flow.$eval('[data-layout-example] .embed-frame', (node) => {
+    const rect = node.getBoundingClientRect()
+    return { top: rect.top, left: rect.left, width: rect.width, height: rect.height, ratio: rect.width / rect.height }
+  })
+  if (desktopFrame.top < 40 || desktopFrame.left < 0) fail(`layout position ${JSON.stringify(desktopFrame)}`)
+  if (desktopFrame.width < 480 || desktopFrame.width > 900) fail(`desktop layout width ${desktopFrame.width}`)
+  if (Math.abs(desktopFrame.ratio - 16 / 9) > 0.08) fail(`desktop layout ratio ${desktopFrame.ratio}`)
+  await flow.screenshot({ path: path.join(outDir, 'films-1440-player.png'), fullPage: false })
   const momImages = await flow.$$eval('#mom img', (nodes) => nodes.length)
   if (momImages) fail(`《我妈没把我养好》 rendered ${momImages} images`)
   const clickedHeading = await flow.$eval('h1', (node) => node.textContent?.trim())
@@ -126,7 +140,7 @@ try {
   const invalidText = await flow.$eval('.form-error', (node) => node.textContent?.trim() || '')
   const iframesAfterInvalid = await flow.$$eval('iframe', (nodes) => nodes.length)
   if (!invalidText.includes('不是可识别')) fail(`invalid message: ${invalidText}`)
-  if (iframesAfterInvalid !== 0) fail('invalid input created an iframe')
+  if (iframesAfterInvalid !== 1) fail(`invalid input changed iframe count to ${iframesAfterInvalid}`)
 
   await setField(flow, 'input[name="youtube-url"]', 'https://youtu.be/abcdefghijk')
   await setField(flow, 'input[name="youtube-title"]', '本机回归')
@@ -161,13 +175,10 @@ try {
   )
   if (publicTestIframe.length) fail('functional test iframe mixed into a public work')
 
-  await flow.click('.functional-test button')
-  await flow.waitForSelector('[data-functional-test="loaded"] iframe')
-  const testSrc = await flow.$eval('[data-functional-test="loaded"] iframe', (node) => node.getAttribute('src') || '')
-  if (!testSrc.startsWith('https://www.youtube-nocookie.com/embed/M7lc1UVf-VE')) fail(`test src ${testSrc}`)
+  const testSrc = layoutSrcEarly
   await new Promise((resolve) => setTimeout(resolve, 9000))
-  const testClaim = await flow.$eval('[data-functional-test="loaded"] [data-playback-claim]', (node) => node.getAttribute('data-playback-claim'))
-  const testStatus = await flow.$eval('[data-functional-test="loaded"] [role="status"]', (node) => node.textContent || '')
+  const testClaim = await flow.$eval('[data-layout-example] [data-playback-claim]', (node) => node.getAttribute('data-playback-claim'))
+  const testStatus = await flow.$eval('[data-layout-example] [role="status"]', (node) => node.textContent || '')
   if (testClaim === 'none') fail('test player never left the initial claim')
   if (testStatus.includes('已返回正在播放') && testClaim !== 'playing') fail('playing text without playing claim')
   await flow.screenshot({ path: path.join(outDir, 'films-1440-youtube.png'), fullPage: true })
@@ -186,12 +197,14 @@ try {
     testSrc,
     testClaim,
     testStatus,
+    desktopFrame,
+    layoutLabel,
   }
 
   await mobile.setViewport({ width: 390, height: 844 })
   await mobile.goto(`${base}/films`, { waitUntil: 'load' })
-  await mobile.waitForSelector('.embed-frame')
-  const mobileFrame = await mobile.$eval('.embed-frame', (node) => {
+  await mobile.waitForSelector('[data-layout-example] .embed-frame')
+  const mobileFrame = await mobile.$eval('[data-layout-example] .embed-frame', (node) => {
     const rect = node.getBoundingClientRect()
     return { width: rect.width, height: rect.height, ratio: rect.width / rect.height }
   })
