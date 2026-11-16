@@ -423,6 +423,33 @@
   padding: 24px;
 }
 
+.studio-hit {
+  position: absolute;
+  inset: 0;
+}
+
+.studio-select {
+  position: absolute;
+  outline: 2px solid #ff5a4a;
+  cursor: move;
+}
+
+.studio-select .corner {
+  position: absolute;
+  z-index: 5;
+  width: 18px;
+  height: 18px;
+  border: 2px solid white;
+  border-radius: 3px;
+  background: #ff5a4a;
+  padding: 0;
+}
+
+.studio-select .corner.tl { left: -9px; top: -9px; cursor: nwse-resize; }
+.studio-select .corner.br { right: -9px; bottom: -9px; cursor: nwse-resize; }
+.studio-select .corner.tr { right: -9px; top: -9px; cursor: nesw-resize; }
+.studio-select .corner.bl { left: -9px; bottom: -9px; cursor: nesw-resize; }
+
 .studio-sheet {
   position: relative;
   margin: 0 auto;

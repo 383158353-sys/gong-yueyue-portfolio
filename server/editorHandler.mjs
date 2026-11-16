@@ -251,9 +251,9 @@ export async function handleEditorRequest({ method, url, headers, body, env }) {
   }
 
   if (upper === 'GET' && action === 'site-published') {
-    if (!config.configured) return json(200, { configured: false, blocks: [], pages: {} })
+    if (!config.configured) return json(200, { configured: false, blocks: [], pages: {}, media: {} })
     const document = await config.store.read('site-published.json')
-    return json(200, { configured: true, blocks: document?.blocks || [], pages: document?.pages || {} })
+    return json(200, { configured: true, blocks: document?.blocks || [], pages: document?.pages || {}, media: document?.media || {} })
   }
 
   if (upper === 'GET' && action === 'public-media') {
@@ -338,7 +338,7 @@ export async function handleEditorRequest({ method, url, headers, body, env }) {
 
   if (upper === 'GET' && action === 'site-draft') {
     const document = await config.store.read('site-draft.json')
-    return json(200, { blocks: document?.blocks || [], pages: document?.pages || {} })
+    return json(200, { blocks: document?.blocks || [], pages: document?.pages || {}, media: document?.media || {} })
   }
 
   if (upper === 'PUT' && action === 'site-draft') {
@@ -428,7 +428,7 @@ function validateSite(input) {
     }
     return next
   })
-  return { blocks, pages: validatePages(input.pages) }
+  return { blocks, pages: validatePages(input.pages), media: validateMedia(input.media) }
 }
 
 const PAGE_KEYS = ['home', 'about', 'projects', 'films', 'scenes', 'characters', 'articles']
@@ -479,6 +479,20 @@ function validatePages(input) {
     }
   }
   return pages
+}
+
+function validateMedia(input) {
+  if (input == null) return {}
+  if (typeof input !== 'object' || Array.isArray(input)) throw new Error('invalid_document')
+  const media = {}
+  for (const [id, box] of Object.entries(input)) {
+    if (!SITE_ID.test(id) || !box || typeof box !== 'object') throw new Error('invalid_document')
+    const next = { dx: num(box.dx || 0, -4000, 4000), dy: num(box.dy || 0, -4000, 4000) }
+    if (box.width != null) next.width = num(box.width, 24, 4000)
+    if (box.height != null) next.height = num(box.height, 24, 4000)
+    media[id] = next
+  }
+  return media
 }
 
 function num(value, min, max) {

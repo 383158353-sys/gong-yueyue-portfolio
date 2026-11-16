@@ -15,8 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { blockStyle, LayoutGuides, layoutRootStyle, placementStyle, TextBind, useSite } from './content/siteContext'
 import BoardRoute from './editor/BoardRoute'
-import Studio, { PublishedCanvas } from './editor/Studio'
-import type { StudioPage } from './editor/pageSeed'
+import Studio, { applyMedia, type MediaBox } from './editor/Studio'
 import './editor/editor.css'
 import { layoutSample } from './layoutSample'
 import GhostCursor from './components/GhostCursor/GhostCursor'
@@ -551,7 +550,7 @@ function App() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [activeWork, setActiveWork] = useState<WorkItem | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode)
-  const [publishedPages, setPublishedPages] = useState<Record<string, StudioPage>>({})
+  const [publishedMedia, setPublishedMedia] = useState<Record<string, MediaBox>>({})
   const { pathname } = useLocation()
   const site = useSite()
   const editing = pathname === '/editor' || pathname.startsWith('/editor/')
@@ -586,10 +585,10 @@ function App() {
     fetch('/api/editor?action=site-published')
       .then((response) => response.json())
       .then((payload) => {
-        if (active) setPublishedPages(payload.pages || {})
+        if (active) setPublishedMedia(payload.media || {})
       })
       .catch(() => {
-        if (active) setPublishedPages({})
+        if (active) setPublishedMedia({})
       })
     return () => {
       active = false
@@ -607,10 +606,16 @@ function App() {
     }
   }, [menuOpen])
 
+  useEffect(() => {
+    if (editing || viewMode === 'mobile') {
+      applyMedia(document, {}, false)
+      return
+    }
+    applyMedia(document, publishedMedia, true)
+  }, [editing, viewMode, page, publishedMedia])
+
   if (pathname === '/board') return <BoardRoute />
   if (editing) return <Studio />
-  const canvasDoc = publishedPages[page]
-  const showOriginal = !canvasDoc?.elements?.length
 
   return (
     <>
@@ -618,8 +623,7 @@ function App() {
       <main className={`portfolio-shell portfolio-${viewMode} min-h-screen overflow-x-hidden bg-[#060203] text-white`} data-view-mode={viewMode}>
       <Navigation menuOpen={menuOpen} setMenuOpen={setMenuOpen} viewMode={viewMode} onViewModeChange={handleViewModeChange} />
 
-      {!showOriginal && <PublishedCanvas doc={canvasDoc} stacked={viewMode === 'mobile'} />}
-      {showOriginal && page === 'home' && <section id="home" ref={heroRef} className="hero-shell relative min-h-[100dvh] overflow-clip">
+      {page === 'home' && <section id="home" ref={heroRef} className="hero-shell relative min-h-[100dvh] overflow-clip">
         <BackgroundVideo src="/assets/home-bottom-video-no-subtitles.mp4" poster="/assets/stills/residual-altar.webp" />
         <div className="hero-frost-layer" aria-hidden="true" />
         <div className="hero-clarity-ring" aria-hidden="true" />
@@ -684,7 +688,7 @@ function App() {
         </div>
       </section>}
 
-      {showOriginal && page === 'home' && <section className="relative z-10 border-y border-white/8 bg-[#060203] px-4 py-8 sm:px-6 md:px-12">
+      {page === 'home' && <section className="relative z-10 border-y border-white/8 bg-[#060203] px-4 py-8 sm:px-6 md:px-12">
         <div className="summary-strip-grid mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4" data-layout-root="home-summary" data-layout-placing={site.showPlacement && site.override('root-home-summary')?.height != null ? 'true' : undefined} style={layoutRootStyle(site.override('root-home-summary')?.height, site.showPlacement && site.override('root-home-summary')?.height != null)}>
           <LayoutGuides group="home-summary" />
           {sectionSummaries.map(([title, summary], index) => ({ title, summary, index, id: `home-summary-${index}` }))
@@ -713,9 +717,9 @@ function App() {
         </div>
       </section>}
 
-      {showOriginal && page === 'films' && <YoutubeSample />}
+      {page === 'films' && <YoutubeSample />}
 
-      {showOriginal && page === 'films' && <>
+      {page === 'films' && <>
       <section id="films" className="section-block bg-[#100507]">
         <SectionMotionLayer image="/assets/stills/red-throne.webp" variant="film" />
         <div className="mx-auto max-w-[1400px]">
@@ -727,7 +731,7 @@ function App() {
 
           <div className="film-feature-layout mt-10 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_420px]">
             <div className="reveal overflow-hidden rounded-[28px] border border-white/10 bg-[#16080a]">
-              <video className="aspect-video w-full bg-black object-cover" src="/assets/hero-trailer.mp4" poster="/assets/stills/residual-altar.webp" controls playsInline />
+              <video data-edit-id="films-trailer" data-edit-kind="video" className="aspect-video w-full bg-black object-cover" src="/assets/hero-trailer.mp4" poster="/assets/stills/residual-altar.webp" controls={!editing} playsInline />
               <div className="p-5 sm:p-8">
                 <div className="flex flex-wrap gap-3 text-sm text-white/58">
                   <span>AI 影像短片</span>
@@ -773,14 +777,14 @@ function App() {
       </section>
       </>}
 
-      {showOriginal && page === 'scenes' && <section id="scenes" className="section-block bg-[#100507]">
+      {page === 'scenes' && <section id="scenes" className="section-block bg-[#100507]">
         <SectionMotionLayer image="/assets/stills/dark-red-marsh.webp" variant="scene" />
         <div className="mx-auto max-w-[1400px]">
           <SectionHeader id="scenes" title="场景设计" body="通过 AI 场景生成、舞台效果图、模型和手绘训练，建立可叙事的空间系统。" />
 
           <div className="scene-feature-layout mt-10 grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
             <button className="reveal image-stage" onClick={() => setLightbox(currentStill)} type="button">
-              <img src={currentStill.src} alt={currentStill.title} />
+              <img data-edit-id="scenes-feature" data-edit-kind="image" src={currentStill.src} alt={currentStill.title} />
               <div className="stage-copy">
                 <span>{currentStill.group}</span>
                 <h3>{currentStill.title}</h3>
@@ -813,7 +817,7 @@ function App() {
                     type="button"
                     aria-label={still.title}
                   >
-                    <img src={still.src} alt="" />
+                    <img data-edit-id={`scenes-thumb-${index}`} data-edit-kind="image" src={still.src} alt={still.title} />
                   </button>
                 ))}
               </div>
@@ -829,7 +833,7 @@ function App() {
         </div>
       </section>}
 
-      {showOriginal && page === 'characters' && <section id="characters" className="section-block bg-[#0a0304]">
+      {page === 'characters' && <section id="characters" className="section-block bg-[#0a0304]">
         <SectionMotionLayer image={characterAssetGroups.styling[0]} variant="character" />
         <div className="mx-auto max-w-[1400px]">
           <SectionHeader id="characters" title="人物造型" body="从历史服化道到特效妆面，从戏剧人物到民族妆造，强调角色身份与影像质感。" />
@@ -852,13 +856,14 @@ function App() {
         </div>
       </section>}
 
-      {showOriginal && page === 'projects' && <section id="creative" className="section-block bg-[#100507]">
+      {page === 'projects' && <section id="creative" className="section-block bg-[#100507]">
         <SectionMotionLayer image={creativeAssetGroups.collaboration[0]} variant="creative" />
         <div className="mx-auto max-w-[1400px]">
           <SectionHeader id="projects" title="创意设计" body="把软件能力转化为风格表达，覆盖动态海报、视效合成、Blender 场景和跨媒介创作。" />
 
           <div className="creative-feature-layout mt-10 grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <SourceMosaic
+              editId="projects-mosaic"
               label="Canva source materials"
               title="从动态海报到综合视觉练习"
               body="旧版作品集中的平面、手绘、三维和摄影合作素材已拆出为独立图片，在网页中重新组织展示。"
@@ -878,7 +883,7 @@ function App() {
         </div>
       </section>}
 
-      {showOriginal && page === 'about' && (
+      {page === 'about' && (
         <section className="section-block bg-[#100507]">
           <div className="mx-auto max-w-[1400px]">
             <SectionHeader id="about" title="关于" body="龚玥月 / Emore。影像美术、AI 短片、人物造型与创意设计。" />
@@ -891,7 +896,7 @@ function App() {
         </section>
       )}
 
-      {showOriginal && page === 'articles' && (
+      {page === 'articles' && (
         <section className="section-block bg-[#0a0304]">
           <div className="mx-auto max-w-[1400px]">
             <SectionHeader id="articles" title="文章" body="这里还没有文章。" />
@@ -899,7 +904,7 @@ function App() {
         </section>
       )}
 
-      {showOriginal && page === 'missing' && (
+      {page === 'missing' && (
         <section className="section-block bg-[#0a0304]">
           <div className="mx-auto max-w-[1400px]">
             <SectionHeader title="没有这一页" body="从顶部导航回到已有栏目。" />
@@ -1147,7 +1152,7 @@ function YoutubeSample() {
     <section className="section-block bg-[#0a0304]" data-layout-sample="true">
       <div className="mx-auto max-w-[1400px]">
         <SectionHeader title={layoutSample.label} body={layoutSample.note} />
-        <div className="yt-frame mt-8">
+        <div className="yt-frame mt-8" data-edit-id="films-youtube" data-edit-kind="video" title="测试视频">
           <iframe
             src={layoutSample.embedUrl}
             title={layoutSample.label}
@@ -1321,6 +1326,8 @@ function BackgroundVideo({ src, poster }: { src: string; poster: string }) {
   return (
     <video
       ref={videoRef}
+      data-edit-id="home-hero-video"
+      data-edit-kind="video"
       className="hero-video absolute inset-0 z-0 h-full w-full object-cover"
       poster={poster}
       autoPlay
@@ -1397,7 +1404,7 @@ function SectionMotionLayer({ image, variant }: { image: string; variant: 'film'
   )
 }
 
-function SourceMosaic({ label, title, body, images }: { label: string; title: string; body: string; images: string[] }) {
+function SourceMosaic({ editId = 'mosaic', label, title, body, images }: { editId?: string; label: string; title: string; body: string; images: string[] }) {
   return (
     <div
       className="reveal source-mosaic spotlight-surface"
@@ -1411,7 +1418,7 @@ function SourceMosaic({ label, title, body, images }: { label: string; title: st
       </div>
       <div className="source-mosaic-grid" aria-hidden="true">
         {images.slice(0, 6).map((image, index) => (
-          <img src={image} alt="" loading="lazy" key={`${image}-${index}`} />
+          <img data-edit-id={`${editId}-img-${index}`} data-edit-kind="image" src={image} alt="" loading="lazy" draggable={false} key={`${image}-${index}`} />
         ))}
       </div>
     </div>
@@ -1456,7 +1463,7 @@ function WorkCard({ item, index, onOpen, blockId, group }: { item: WorkItem; ind
       {item.assets && (
         <div className="work-card-assets">
           {item.assets.slice(0, 4).map((asset, assetIndex) => (
-            <img src={asset} alt={`${title} 素材 ${assetIndex + 1}`} loading="lazy" draggable={false} key={asset} />
+            <img data-edit-id={`${blockId}-img-${assetIndex}`} data-edit-kind="image" src={asset} alt={`${title} 素材 ${assetIndex + 1}`} loading="lazy" draggable={false} key={asset} />
           ))}
         </div>
       )}
