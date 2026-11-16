@@ -57,6 +57,21 @@ test('file storage is refused on Vercel even with a token', () => {
   assert.equal(config.reason, 'file_store_not_durable_on_vercel')
 })
 
+test('private Vercel Blob is selected only when editor auth and blob credentials both exist', () => {
+  const missingEditor = resolveEditorConfig({ BLOB_READ_WRITE_TOKEN: 'blob-token', VERCEL: '1' })
+  assert.equal(missingEditor.configured, false)
+  assert.equal(missingEditor.reason, 'missing_token')
+
+  const selected = resolveEditorConfig({
+    EDITOR_ACCESS_TOKEN: TOKEN,
+    BLOB_STORE_ID: 'store_test',
+    VERCEL: '1',
+  })
+  assert.equal(selected.configured, true)
+  assert.equal(selected.reason, 'vercel-blob')
+  assert.equal(selected.store.kind, 'vercel-blob')
+})
+
 test('draft survives a new request, publish is separate, and strangers are rejected', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'editor-store-'))
   try {

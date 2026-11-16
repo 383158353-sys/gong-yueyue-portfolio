@@ -1,26 +1,89 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { BlobNotFoundError, get, put } from '@vercel/blob'
 
 const MAX_UPLOAD = 6 * 1024 * 1024
 const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+
+const BLOB_PREFIX_DEFAULT = 'editor/private-canvas'
 
 export function resolveEditorConfig(env = process.env) {
   const token = String(env.EDITOR_ACCESS_TOKEN || '')
   const storeMode = String(env.EDITOR_STORE || '')
   const dir = String(env.EDITOR_STORE_DIR || '')
   const onVercel = env.VERCEL === '1'
+  const secureCookie = env.EDITOR_COOKIE_SECURE === '1' || onVercel
   if (!token) return { configured: false, reason: 'missing_token', token: '', store: null }
-  if (onVercel || storeMode !== 'file' || !dir) {
-    return {
-      configured: false,
-      reason: onVercel ? 'file_store_not_durable_on_vercel' : 'missing_store',
-      token: '',
-      store: null,
+  if (env.BLOB_READ_WRITE_TOKEN || env.BLOB_STORE_ID) {
+    return { configured: true, reason: 'vercel-blob', token, store: createBlobStore(env), secureCookie }
+  }
+  if (onVercel && storeMode === 'file') {
+    return { configured: false, reason: 'file_store_not_durable_on_vercel', token: '', store: null }
+  }
+  if (!onVercel && storeMode === 'file' && dir) {
+    return { configured: true, reason: 'file', token, store: createFileStore(dir), secureCookie }
+  }
+  return { configured: false, reason: 'missing_store', token: '', store: null }
+}
+
+function blobPath(env, name) {
+  const prefix = String(env.EDITOR_BLOB_PREFIX || BLOB_PREFIX_DEFAULT).replace(/^\/+|\/+$/g, '')
+  return `${prefix}/${name}`
+}
+
+function blobAuth(env) {
+  if (env.BLOB_READ_WRITE_TOKEN) return { token: env.BLOB_READ_WRITE_TOKEN }
+  return { storeId: env.BLOB_STORE_ID }
+}
+
+function createBlobStore(env) {
+  const auth = blobAuth(env)
+  const read = async (pathname) => {
+    try {
+      return await get(pathname, { access: 'private', useCache: false, ...auth })
+    } catch (error) {
+      if (error instanceof BlobNotFoundError || error?.name === 'BlobNotFoundError') return null
+      throw error
     }
   }
-  return { configured: true, reason: 'file', token, store: createFileStore(dir), secureCookie: env.EDITOR_COOKIE_SECURE === '1' }
+  const bodyBuffer = async (result) => {
+    if (!result?.stream) return null
+    return Buffer.from(await new Response(result.stream).arrayBuffer())
+  }
+  return {
+    kind: 'vercel-blob',
+    async read(name) {
+      const result = await read(blobPath(env, name))
+      if (!result?.stream) return null
+      return JSON.parse((await bodyBuffer(result)).toString('utf8'))
+    },
+    async write(name, value) {
+      await put(blobPath(env, name), JSON.stringify(value), {
+        access: 'private',
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        contentType: 'application/json',
+        ...auth,
+      })
+    },
+    async saveMedia(id, buffer, mime) {
+      await put(blobPath(env, `media/${id}`), buffer, {
+        access: 'private',
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        contentType: mime,
+        ...auth,
+      })
+    },
+    async readMedia(id) {
+      const result = await read(blobPath(env, `media/${id}`))
+      const buffer = await bodyBuffer(result)
+      if (!buffer) return null
+      return { mime: result.blob?.contentType || 'application/octet-stream', buffer }
+    },
+  }
 }
 
 function createFileStore(dir) {
@@ -179,7 +242,7 @@ export async function handleEditorRequest({ method, url, headers, body, env }) {
   const upper = String(method || 'GET').toUpperCase()
 
   if (upper === 'GET' && action === 'status') {
-    return json(200, { configured: config.configured })
+    return json(200, { configured: config.configured, storage: config.configured ? config.reason : 'none' })
   }
 
   if (upper === 'GET' && action === 'published') {

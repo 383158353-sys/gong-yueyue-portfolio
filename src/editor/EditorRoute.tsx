@@ -27,6 +27,7 @@ async function readError(response: Response) {
 
 export default function EditorRoute() {
   const [configured, setConfigured] = useState<boolean | null>(null)
+  const [storage, setStorage] = useState('none')
   const [token, setToken] = useState('')
   const [unlocked, setUnlocked] = useState(false)
   const [document, setDocument] = useState<CanvasDocument>(emptyDocument)
@@ -45,7 +46,8 @@ export default function EditorRoute() {
       .then((response) => response.json())
       .then((payload) => {
         setConfigured(Boolean(payload.configured))
-        setStatus(payload.configured ? '服务端已配置。凭证不会写进页面。' : '服务端未配置，读写已关闭。')
+        setStorage(payload.storage || 'none')
+        setStatus(payload.configured ? '保存已接通。凭证只在服务端核对。' : '保存未接通，读写已关闭。')
       })
       .catch(() => {
         setConfigured(false)
@@ -244,9 +246,9 @@ export default function EditorRoute() {
   if (configured === false) {
     return (
       <main className="pv-app">
-        <p className="pv-banner">编辑接口已关闭。线上预览没有编辑凭证，也没有可持久的存储，所以不能匿名摆放或保存。这不是隐藏网址能绕过的。</p>
+        <p className="pv-banner">保存还没有接通。现在不能上传、保存或发布。公开作品集保持原样。知道这个地址也不能写入。</p>
         <div className="pv-gate">
-          <h1>私人画布还不能保存</h1>
+          <h1>私人画布暂时不能保存</h1>
           <p>{status}</p>
           <Link to="/">返回作品集</Link>
         </div>
@@ -281,7 +283,9 @@ export default function EditorRoute() {
   return (
     <main className="pv-app">
       <p className="pv-banner">
-        当前保存是这个开发服务上的服务端文件，不是已经接通的云端。线上预览在配置凭证和持久存储之前会拒绝读写。未点发布时，公开作品集和 /board 都不会用这份草稿。
+        {storage === 'vercel-blob'
+          ? '草稿和图片写在这个项目的私人 Blob 里。刷新后重新输入凭证可以恢复。未点发布时，公开页面和 /board 不会改变。'
+          : '当前草稿写在这个开发服务的文件里，只供本机验收，不是云端。未点发布时，公开页面和 /board 不会改变。'}
       </p>
       <div className="pv-bar">
         <h1>私人画布</h1>
