@@ -71,22 +71,27 @@ export function applyMedia(doc: Document, media: MediaMap, active: boolean) {
       element.style.maxWidth = ''
       element.style.maxHeight = ''
       element.style.minWidth = ''
+      element.style.minHeight = ''
       element.style.aspectRatio = ''
       delete element.dataset.editSized
       return
     }
     element.style.transform = `translate(${box.dx || 0}px, ${box.dy || 0}px)`
+    element.style.boxSizing = 'border-box'
     if (sized) {
-      element.style.maxWidth = 'none'
-      element.style.maxHeight = 'none'
-      element.style.minWidth = '0'
       element.style.aspectRatio = 'auto'
-      element.style.boxSizing = 'border-box'
       element.dataset.editSized = 'true'
       releaseClip(element)
+    } else {
+      element.style.aspectRatio = ''
+      delete element.dataset.editSized
     }
     element.style.width = box.width ? `${box.width}px` : ''
     element.style.height = box.height ? `${box.height}px` : ''
+    element.style.minWidth = box.width ? `${box.width}px` : ''
+    element.style.minHeight = box.height ? `${box.height}px` : ''
+    element.style.maxWidth = box.width ? `${box.width}px` : ''
+    element.style.maxHeight = box.height ? `${box.height}px` : ''
   })
   restoreUnusedClips(doc)
 }
@@ -168,6 +173,8 @@ export default function Studio() {
   const [box, setBox] = useState<{ left: number; top: number; width: number; height: number; cssWidth: number; cssHeight: number } | null>(null)
   const mediaRef = useRef(media)
   mediaRef.current = media
+  const selectedRef = useRef(selected)
+  selectedRef.current = selected
   const blocksRef = useRef<DraftBlock[]>([])
   const hitRef = useRef<HTMLDivElement>(null)
   const lastTextClick = useRef({ id: '', time: 0 })
@@ -218,8 +225,8 @@ export default function Studio() {
       if (event.target instanceof Node && active.contains(event.target)) return
       active.blur()
     }
-    window.addEventListener('pointerdown', onPointerDown)
-    return () => window.removeEventListener('pointerdown', onPointerDown)
+    window.addEventListener('pointerdown', onPointerDown, true)
+    return () => window.removeEventListener('pointerdown', onPointerDown, true)
   }, [])
 
   useEffect(() => {
@@ -409,13 +416,17 @@ export default function Studio() {
     window.addEventListener('pointerup', end)
   }
 
-  const startResize = (event: ReactPointerEvent, corner: Corner) => {
-    if (!selected) return
+  const startResize = (event: ReactPointerEvent<HTMLButtonElement>, corner: Corner) => {
+    const id = selectedRef.current
+    if (!id) return
     event.stopPropagation()
     event.preventDefault()
-    const current = mediaRef.current[selected] || { dx: 0, dy: 0 }
-    const node = frameRef.current?.contentDocument?.querySelector<HTMLElement>(`[data-edit-id="${selected}"]`)
+    const handle = event.currentTarget
+    handle.setPointerCapture(event.pointerId)
+    const current = mediaRef.current[id] || { dx: 0, dy: 0 }
+    const node = frameRef.current?.contentDocument?.querySelector<HTMLElement>(`[data-edit-id="${id}"]`)
     const rect = node?.getBoundingClientRect()
+    const liveScale = frameScale()
     const origin = {
       x: event.clientX,
       y: event.clientY,
@@ -425,9 +436,8 @@ export default function Studio() {
       height: current.height || rect?.height || 80,
     }
     const move = (native: PointerEvent) => {
-    const liveScale = frameScale()
-    const dx = (native.clientX - origin.x) / liveScale
-    const dy = (native.clientY - origin.y) / liveScale
+      const dx = (native.clientX - origin.x) / liveScale
+      const dy = (native.clientY - origin.y) / liveScale
       let { width, height, dx: nextX, dy: nextY } = origin
       if (corner === 'br') {
         width += dx
@@ -447,18 +457,17 @@ export default function Studio() {
         nextX += dx
       }
       const size = clampMediaSize(width, height)
-      update(selected, { dx: Math.round(nextX), dy: Math.round(nextY), width: size.width, height: size.height })
+      update(id, { dx: Math.round(nextX), dy: Math.round(nextY), width: size.width, height: size.height })
     }
-    const end = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', end)
-      const node = frameRef.current?.contentDocument?.querySelector<HTMLElement>(`[data-edit-id="${selected}"]`)
-      if (!node) return
-      const visible = visibleMediaSize(node)
-      update(selected, visible)
+    const end = (native: PointerEvent) => {
+      if (handle.hasPointerCapture(native.pointerId)) handle.releasePointerCapture(native.pointerId)
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', end)
+      handle.removeEventListener('pointercancel', end)
     }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', end)
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', end)
+    handle.addEventListener('pointercancel', end)
   }
 
   const items = () => {
@@ -528,15 +537,12 @@ export default function Studio() {
                   syncFrame()
                 }}
               />
-              {!preview && (
-                <div className="studio-hit" ref={hitRef} onPointerDown={startMove}>
-                  {selected && box && (
-                    <div className="studio-select" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
-                      {(['tl', 'tr', 'bl', 'br'] as Corner[]).map((corner) => (
-                        <button key={corner} type="button" className={`corner ${corner}`} aria-label={`拖动调整大小 ${corner}`} onPointerDown={(event) => startResize(event, corner)} />
-                      ))}
-                    </div>
-                  )}
+              {!preview && <div className="studio-hit" ref={hitRef} onPointerDown={startMove} />}
+              {!preview && selected && box && (
+                <div className="studio-select" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
+                  {(['tl', 'tr', 'bl', 'br'] as Corner[]).map((corner) => (
+                    <button key={corner} type="button" className={`corner ${corner}`} aria-label={`拖动调整大小 ${corner}`} onPointerDown={(event) => startResize(event, corner)} />
+                  ))}
                 </div>
               )}
             </div>

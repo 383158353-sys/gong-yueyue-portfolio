@@ -431,25 +431,28 @@
 
 .studio-hit {
   position: absolute;
+  z-index: 2;
   inset: 0;
 }
 
 .studio-select {
   position: absolute;
+  z-index: 6;
   outline: 2px solid #ff5a4a;
-  cursor: move;
   pointer-events: none;
 }
 
 .studio-select .corner {
   position: absolute;
-  z-index: 5;
+  z-index: 7;
   width: 18px;
   height: 18px;
   border: 2px solid white;
   border-radius: 3px;
   background: #ff5a4a;
   padding: 0;
+  pointer-events: auto;
+  touch-action: none;
 }
 
 .studio-select .corner.tl { left: -9px; top: -9px; cursor: nwse-resize; }
