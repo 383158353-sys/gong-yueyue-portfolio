@@ -74,23 +74,17 @@ function measureRoots(current: BlockOverride[]) {
   roots.forEach((root) => {
     const group = root.getAttribute('data-layout-root')
     if (!group) return
-    const rootRect = root.getBoundingClientRect()
+    const space = rootSpace(root as HTMLElement)
     const rootId = `root-${group}`
     if (next.find((item) => item.id === rootId)?.height == null) {
-      next = upsert(next, rootId, { width: Math.ceil(rootRect.width), height: Math.ceil(rootRect.height) })
+      next = upsert(next, rootId, { width: Math.ceil(space.width), height: Math.ceil(space.height) })
     }
     root.querySelectorAll(`[data-group="${group}"]`).forEach((node) => {
       const id = node.getAttribute('data-block-id')
       if (!id) return
       const existing = next.find((item) => item.id === id)
       if (existing?.x != null && existing.y != null && existing.width != null && existing.height != null) return
-      const rect = node.getBoundingClientRect()
-      next = upsert(next, id, {
-        x: Math.round(rect.left - rootRect.left),
-        y: Math.round(rect.top - rootRect.top),
-        width: Math.max(36, Math.round(rect.width)),
-        height: Math.max(24, Math.round(rect.height)),
-      })
+      next = upsert(next, id, boxInRoot(node as HTMLElement, root as HTMLElement))
     })
   })
   return next
@@ -98,6 +92,45 @@ function measureRoots(current: BlockOverride[]) {
 
 function sameBlocks(blocks: BlockOverride[]) {
   return JSON.stringify(blocks)
+}
+
+let activeGesture: { kind: 'move' | 'resize'; pointerId: number } | null = null
+
+function rootSpace(root: HTMLElement) {
+  const rect = root.getBoundingClientRect()
+  const style = getComputedStyle(root)
+  const borderLeft = Number.parseFloat(style.borderLeftWidth) || 0
+  const borderTop = Number.parseFloat(style.borderTopWidth) || 0
+  return {
+    originX: rect.left + borderLeft - root.scrollLeft,
+    originY: rect.top + borderTop - root.scrollTop,
+    width: root.clientWidth,
+    height: root.clientHeight,
+  }
+}
+
+function pointInRoot(clientX: number, clientY: number, root: HTMLElement) {
+  const space = rootSpace(root)
+  return { x: clientX - space.originX, y: clientY - space.originY, width: space.width, height: space.height }
+}
+
+function boxInRoot(node: HTMLElement, root: HTMLElement) {
+  const rect = node.getBoundingClientRect()
+  const origin = pointInRoot(rect.left, rect.top, root)
+  return {
+    x: Math.round(origin.x),
+    y: Math.round(origin.y),
+    width: Math.max(36, Math.round(rect.width)),
+    height: Math.max(24, Math.round(rect.height)),
+  }
+}
+
+function hitsResizeHandle(host: HTMLElement, clientX: number, clientY: number) {
+  const handle = host.querySelector(':scope > .edit-resize')
+  if (!handle) return false
+  const rect = handle.getBoundingClientRect()
+  const pad = 14
+  return clientX >= rect.left - pad && clientX <= rect.right + pad && clientY >= rect.top - pad && clientY <= rect.bottom + pad
 }
 
 export function SiteProvider({ children }: { children: ReactNode }) {
@@ -262,37 +295,37 @@ export function SiteProvider({ children }: { children: ReactNode }) {
       },
       pointerDown: (event, block) => {
         if (!editing || !unlocked || event.button !== 0) return
-        if ((event.target as HTMLElement).closest('button, a, input, textarea, .edit-resize')) return
+        if (activeGesture?.kind === 'resize') return
+        const host = event.currentTarget as HTMLElement
+        if ((event.target as HTMLElement).closest('button, a, input, textarea, .edit-resize') || hitsResizeHandle(host, event.clientX, event.clientY)) {
+          if (layoutModeRef.current && hitsResizeHandle(host, event.clientX, event.clientY)) {
+            event.stopPropagation()
+            const resize = value.startResize
+            resize(event, block.id)
+          }
+          return
+        }
+        event.preventDefault()
         event.stopPropagation()
         const additive = event.shiftKey
         setSelected((current) => (additive ? Array.from(new Set([...current, block.id])) : [block.id]))
-        if (!layoutModeRef.current) return
+        if (!layoutModeRef.current || activeGesture) return
         const before = draftRef.current
-        const root = (event.currentTarget as HTMLElement).closest('[data-layout-root]') as HTMLElement | null
-        const rootRect = root?.getBoundingClientRect()
-        const selfRect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-        const existing = before.find((item) => item.id === block.id)
-        const originBox = {
-          x: existing?.x ?? Math.round(selfRect.left - (rootRect?.left ?? selfRect.left)),
-          y: existing?.y ?? Math.round(selfRect.top - (rootRect?.top ?? selfRect.top)),
-          width: existing?.width ?? Math.round(selfRect.width),
-          height: existing?.height ?? Math.round(selfRect.height),
-        }
-        if (existing?.x == null) {
+        const root = host.closest('[data-layout-root]') as HTMLElement | null
+        if (!root) return
+        const originBox = boxInRoot(host, root)
+        if (before.find((item) => item.id === block.id)?.x == null) {
           const seeded = measureRoots(before)
           draftRef.current = seeded
           setDraft(seeded)
         }
-        const origin = { x: event.clientX, y: event.clientY }
+        const startClient = { x: event.clientX, y: event.clientY }
+        activeGesture = { kind: 'move', pointerId: event.pointerId }
         const move = (native: PointerEvent) => {
-          if (!layoutModeRef.current) return
-          const dx = native.clientX - origin.x
-          const dy = native.clientY - origin.y
-          let x = Math.round(originBox.x + dx)
-          let y = Math.round(originBox.y + dy)
-          const rootWidth = root?.clientWidth ?? 1200
-          const rootHeight = root?.clientHeight ?? 800
-          const others = [...(root?.querySelectorAll(`[data-group="${block.group}"]`) ?? [])]
+          if (activeGesture?.kind !== 'move' || !layoutModeRef.current) return
+          let x = Math.round(originBox.x + native.clientX - startClient.x)
+          let y = Math.round(originBox.y + native.clientY - startClient.y)
+          const others = [...root.querySelectorAll(`[data-group="${block.group}"]`)]
             .map((node) => {
               const id = node.getAttribute('data-block-id') || ''
               const item = draftRef.current.find((entry) => entry.id === id)
@@ -300,11 +333,12 @@ export function SiteProvider({ children }: { children: ReactNode }) {
               return { id, x: item.x, y: item.y, width: item.width, height: item.height }
             })
             .filter((item): item is { id: string; x: number; y: number; width: number; height: number } => Boolean(item))
+          const space = rootSpace(root)
           const snap = snapPosition(
             { id: block.id, x, y, width: originBox.width, height: originBox.height },
             others,
-            rootWidth,
-            rootHeight,
+            space.width,
+            space.height,
             snapThresholdForScale(1),
           )
           if (snap.snapX !== null) x = snap.snapX
@@ -312,8 +346,7 @@ export function SiteProvider({ children }: { children: ReactNode }) {
           const guideX = snap.guides.find((guide) => guide.type === 'v')
           const guideY = snap.guides.find((guide) => guide.type === 'h')
           setGuides({ group: block.group, x: guideX && 'x' in guideX ? guideX.x : null, y: guideY && 'y' in guideY ? guideY.y : null })
-          const current = draftRef.current
-          const next = upsert(current, block.id, { x, y, width: originBox.width, height: originBox.height })
+          const next = upsert(draftRef.current, block.id, { x, y, width: originBox.width, height: originBox.height })
           const bottom = y + originBox.height + 32
           const rootId = `root-${block.group}`
           const rootBlock = next.find((item) => item.id === rootId)
@@ -324,23 +357,37 @@ export function SiteProvider({ children }: { children: ReactNode }) {
         const end = () => {
           window.removeEventListener('pointermove', move)
           window.removeEventListener('pointerup', end)
+          window.removeEventListener('pointercancel', end)
+          if (activeGesture?.pointerId === event.pointerId) activeGesture = null
           setGuides(null)
           history.current = { past: [...history.current.past, before].slice(-40), future: [] }
-          setStatus('已自由移动。位置会写进这一页草稿。宽屏公开页在发布后使用它，手机仍按原顺序往下排。')
+          setStatus('已自由移动。位置和参考线用的是同一组容器坐标。宽屏公开页在发布后使用它，手机仍按原顺序往下排。')
         }
         window.addEventListener('pointermove', move)
         window.addEventListener('pointerup', end)
+        window.addEventListener('pointercancel', end)
       },
       startResize: (event, id) => {
         if (!layoutModeRef.current) return
+        if (activeGesture?.kind === 'resize' && activeGesture.pointerId === event.pointerId) return
         event.stopPropagation()
         event.preventDefault()
+        const host = ((event.currentTarget as HTMLElement).closest('[data-block-id]') ?? event.currentTarget) as HTMLElement
+        const root = host.closest('[data-layout-root]') as HTMLElement | null
         const before = draftRef.current
         const existing = before.find((item) => item.id === id)
-        if (existing?.width == null || existing.height == null) return
-        const origin = { x: event.clientX, y: event.clientY, width: existing.width, height: existing.height }
+        const measured = root ? boxInRoot(host, root) : null
+        const origin = {
+          x: event.clientX,
+          y: event.clientY,
+          width: existing?.width ?? measured?.width ?? Math.round(host.getBoundingClientRect().width),
+          height: existing?.height ?? measured?.height ?? Math.round(host.getBoundingClientRect().height),
+          left: existing?.x ?? measured?.x,
+          top: existing?.y ?? measured?.y,
+        }
+        activeGesture = { kind: 'resize', pointerId: event.pointerId }
         const move = (native: PointerEvent) => {
-          if (!layoutModeRef.current) return
+          if (activeGesture?.kind !== 'resize') return
           const width = Math.max(80, Math.round(origin.width + native.clientX - origin.x))
           const height = Math.max(36, Math.round(origin.height + native.clientY - origin.y))
           const next = upsert(draftRef.current, id, { width, height })
@@ -350,11 +397,14 @@ export function SiteProvider({ children }: { children: ReactNode }) {
         const end = () => {
           window.removeEventListener('pointermove', move)
           window.removeEventListener('pointerup', end)
+          window.removeEventListener('pointercancel', end)
+          if (activeGesture?.pointerId === event.pointerId) activeGesture = null
           history.current = { past: [...history.current.past, before].slice(-40), future: [] }
-          setStatus('已改框的宽高，不是只缩放图片内部。')
+          setStatus('已改框的宽高。位置没有跟着变。')
         }
         window.addEventListener('pointermove', move)
         window.addEventListener('pointerup', end)
+        window.addEventListener('pointercancel', end)
       },
       patch,
       deleteSelected: () => {
@@ -489,7 +539,16 @@ export function TextBind({ id, group, fallback, className }: { id: string; group
     >
       {block?.text ?? fallback}
       {editing && site.layoutMode && site.selected.includes(id) && (
-        <button type="button" className="edit-resize" aria-label="拖动调整大小" onPointerDown={(event) => site.startResize(event, id)} />
+        <button
+          type="button"
+          className="edit-resize"
+          aria-label="拖动调整大小"
+          onPointerDownCapture={(event) => {
+            event.stopPropagation()
+            event.preventDefault()
+            site.startResize(event, id)
+          }}
+        />
       )}
     </span>
   )

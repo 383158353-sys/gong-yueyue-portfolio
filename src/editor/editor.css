@@ -260,21 +260,34 @@
 
 .edit-block > .edit-resize {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
-  z-index: 40;
-  width: 22px;
-  height: 22px;
-  border: 0;
-  border-radius: 4px;
+  right: -8px;
+  bottom: -8px;
+  z-index: 50;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 6px;
   background: #ff5a4a;
   cursor: nwse-resize;
   touch-action: none;
+  pointer-events: auto;
+}
+
+.reveal.is-visible.edit-block.is-placed,
+.reveal.is-visible.spotlight-surface.is-placed {
+  transform: none;
+}
+
+[data-layout-placing='true'] .summary-tile.reveal.is-visible {
+  position: static;
+  transform: none;
 }
 
 .is-placed {
   box-sizing: border-box;
   min-height: 0;
+  overflow: visible;
   transform: none;
 }
 

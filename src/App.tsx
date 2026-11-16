@@ -434,6 +434,7 @@ function getInitialViewMode(): ViewMode {
 
 function handleInteractivePointerMove(event: React.PointerEvent<HTMLElement>) {
   if (window.matchMedia('(pointer: coarse)').matches) return
+  if (event.currentTarget.classList.contains('is-placed')) return
   const element = event.currentTarget
   const rect = element.getBoundingClientRect()
   const x = (event.clientX - rect.left) / rect.width
@@ -663,27 +664,31 @@ function App() {
       </section>}
 
       {page === 'home' && <section className="relative z-10 border-y border-white/8 bg-[#060203] px-4 py-8 sm:px-6 md:px-12">
-        <div className="summary-strip-grid mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4" data-layout-root="home-summary" style={layoutRootStyle(site.override('root-home-summary')?.height, site.showPlacement && site.override('root-home-summary')?.height != null)}>
+        <div className="summary-strip-grid mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4" data-layout-root="home-summary" data-layout-placing={site.showPlacement && site.override('root-home-summary')?.height != null ? 'true' : undefined} style={layoutRootStyle(site.override('root-home-summary')?.height, site.showPlacement && site.override('root-home-summary')?.height != null)}>
           <LayoutGuides group="home-summary" />
           {sectionSummaries.map(([title, summary], index) => ({ title, summary, index, id: `home-summary-${index}` }))
             .filter(({ id }) => editing || !site.override(id)?.hidden)
             .sort((a, b) => (site.override(a.id)?.order ?? a.index) - (site.override(b.id)?.order ?? b.index))
-            .map(({ title, summary, index, id }) => (
+            .map(({ title, summary, index, id }) => {
+            const placedTitle = Boolean(placementStyle(site.override(id), site.showPlacement))
+            return (
             <div
-              className={`reveal summary-tile spotlight-surface ${editing && site.unlocked ? 'edit-block' : ''} ${site.selected.includes(id) ? 'is-selected' : ''} ${site.guideId === id ? 'is-guide' : ''} ${site.override(id)?.hidden ? 'is-hidden-block' : ''}`}
-              style={{ transitionDelay: `${index * 70}ms`, order: site.override(id)?.order ?? index, ...blockStyle(site.override(id)), ...placementStyle(site.override(id), site.showPlacement) }}
-              data-block-id={editing && site.unlocked ? id : undefined}
-              data-group={editing && site.unlocked ? 'home-summary' : undefined}
-              data-order={site.override(id)?.order ?? index}
+              className="reveal summary-tile spotlight-surface"
+              style={{ transitionDelay: `${index * 70}ms` }}
               onPointerMove={handleInteractivePointerMove}
               onPointerLeave={handleInteractivePointerLeave}
-              onPointerDown={editing && site.unlocked ? (event) => site.pointerDown(event, { id, group: 'home-summary', order: site.override(id)?.order ?? index }) : undefined}
               key={id}
             >
-              <p className="text-lg tracking-[-0.03em] text-white">{site.override(id)?.text ?? title}</p>
+              {placedTitle && <p className="text-lg tracking-[-0.03em] text-white invisible" aria-hidden="true">{site.override(id)?.text ?? title}</p>}
+              {(editing && site.unlocked) || placedTitle ? (
+                <TextBind id={id} group="home-summary" fallback={title} className="text-lg tracking-[-0.03em] text-white" />
+              ) : (
+                <p className="text-lg tracking-[-0.03em] text-white">{site.override(id)?.text ?? title}</p>
+              )}
               <p className="mt-3 text-sm leading-6 text-white/58">{site.override(id)?.detail ?? summary}</p>
             </div>
-          ))}
+            )
+          })}
         </div>
       </section>}
 
@@ -1430,7 +1435,7 @@ function WorkCard({ item, index, onOpen, blockId, group }: { item: WorkItem; ind
       {item.assets && (
         <div className="work-card-assets">
           {item.assets.slice(0, 4).map((asset, assetIndex) => (
-            <img src={asset} alt={`${title} 素材 ${assetIndex + 1}`} loading="lazy" key={asset} />
+            <img src={asset} alt={`${title} 素材 ${assetIndex + 1}`} loading="lazy" draggable={false} key={asset} />
           ))}
         </div>
       )}
@@ -1447,7 +1452,16 @@ function WorkCard({ item, index, onOpen, blockId, group }: { item: WorkItem; ind
         </span>
       )}
       {editing && site.layoutMode && site.selected.includes(blockId) && (
-        <button type="button" className="edit-resize" aria-label="拖动调整大小" onPointerDown={(event) => site.startResize(event, blockId)} />
+        <button
+          type="button"
+          className="edit-resize"
+          aria-label="拖动调整大小"
+          onPointerDownCapture={(event) => {
+            event.stopPropagation()
+            event.preventDefault()
+            site.startResize(event, blockId)
+          }}
+        />
       )}
     </article>
   )
