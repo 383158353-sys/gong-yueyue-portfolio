@@ -104,7 +104,12 @@ export default function LiquidEther({
 
     const scene = new THREE.Scene()
     const camera = new THREE.Camera()
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, powerPreference: 'high-performance' })
+    let renderer
+    try {
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, powerPreference: 'high-performance' })
+    } catch {
+      return
+    }
     renderer.setClearColor(0x000000, 0)
     renderer.domElement.className = 'liquid-ether-canvas'
     mount.appendChild(renderer.domElement)
