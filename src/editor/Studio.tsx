@@ -26,20 +26,74 @@ const pageIdFromPath = (pathname: string) => {
   return PAGES.some(([key]) => key === id) ? id : 'home'
 }
 
+export const MEDIA_MAX_WIDTH = 1600
+export const MEDIA_MAX_HEIGHT = 1200
+
+export function clampMediaSize(width: number, height: number) {
+  return {
+    width: Math.max(48, Math.min(MEDIA_MAX_WIDTH, Math.round(width))),
+    height: Math.max(36, Math.min(MEDIA_MAX_HEIGHT, Math.round(height))),
+  }
+}
+
+function releaseClip(element: HTMLElement) {
+  let node = element.parentElement
+  while (node && node !== element.ownerDocument.body) {
+    const style = getComputedStyle(node)
+    if ((style.overflowX !== 'visible' || style.overflowY !== 'visible') && node.dataset.editClip == null) {
+      node.dataset.editClip = `${node.style.overflow}|${node.style.overflowX}|${node.style.overflowY}`
+      node.style.overflow = 'visible'
+    }
+    node = node.parentElement
+  }
+}
+
+function restoreUnusedClips(doc: Document) {
+  doc.querySelectorAll<HTMLElement>('[data-edit-clip]').forEach((node) => {
+    if (node.querySelector('[data-edit-sized]')) return
+    const [overflow = '', overflowX = '', overflowY = ''] = (node.dataset.editClip || '').split('|')
+    node.style.overflow = overflow
+    node.style.overflowX = overflowX
+    node.style.overflowY = overflowY
+    delete node.dataset.editClip
+  })
+}
+
 export function applyMedia(doc: Document, media: MediaMap, active: boolean) {
   doc.querySelectorAll<HTMLElement>('[data-edit-id]').forEach((element) => {
     const id = element.getAttribute('data-edit-id') || ''
     const box = active ? media[id] : undefined
+    const sized = Boolean(box?.width || box?.height)
     if (!box) {
       element.style.transform = ''
       element.style.width = ''
       element.style.height = ''
+      element.style.maxWidth = ''
+      element.style.maxHeight = ''
+      element.style.minWidth = ''
+      element.style.aspectRatio = ''
+      delete element.dataset.editSized
       return
     }
     element.style.transform = `translate(${box.dx || 0}px, ${box.dy || 0}px)`
+    if (sized) {
+      element.style.maxWidth = 'none'
+      element.style.maxHeight = 'none'
+      element.style.minWidth = '0'
+      element.style.aspectRatio = 'auto'
+      element.style.boxSizing = 'border-box'
+      element.dataset.editSized = 'true'
+      releaseClip(element)
+    }
     element.style.width = box.width ? `${box.width}px` : ''
     element.style.height = box.height ? `${box.height}px` : ''
   })
+  restoreUnusedClips(doc)
+}
+
+export function visibleMediaSize(element: HTMLElement) {
+  const rect = element.getBoundingClientRect()
+  return { width: Math.round(rect.width), height: Math.round(rect.height) }
 }
 
 export default function Studio() {
@@ -182,11 +236,16 @@ export default function Studio() {
         height += dy
         nextX += dx
       }
-      update(selected, { dx: Math.round(nextX), dy: Math.round(nextY), width: Math.max(48, Math.round(width)), height: Math.max(36, Math.round(height)) })
+      const size = clampMediaSize(width, height)
+      update(selected, { dx: Math.round(nextX), dy: Math.round(nextY), width: size.width, height: size.height })
     }
     const end = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', end)
+      const node = frameRef.current?.contentDocument?.querySelector<HTMLElement>(`[data-edit-id="${selected}"]`)
+      if (!node) return
+      const visible = visibleMediaSize(node)
+      update(selected, visible)
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', end)
@@ -288,9 +347,9 @@ export default function Studio() {
                   <p>{selected}</p>
                   <label>水平<input type="number" value={media[selected]?.dx || 0} onChange={(event) => update(selected, { dx: Number(event.target.value) })} /></label>
                   <label>垂直<input type="number" value={media[selected]?.dy || 0} onChange={(event) => update(selected, { dy: Number(event.target.value) })} /></label>
-                  <label>宽<input type="number" value={media[selected]?.width || Math.round((box?.width || 0) / scale)} onChange={(event) => update(selected, { width: Number(event.target.value) })} /></label>
-                  <label>高<input type="number" value={media[selected]?.height || Math.round((box?.height || 0) / scale)} onChange={(event) => update(selected, { height: Number(event.target.value) })} /></label>
-                  <p className="studio-note">没改过的内容不会写入。上传后只移动改过的媒体，导航和背景仍在。手机不使用这些桌面位移。</p>
+                  <label>宽<input type="number" value={box ? Math.round(box.width / scale) : media[selected]?.width || 0} onChange={(event) => update(selected, clampMediaSize(Number(event.target.value), media[selected]?.height || Math.round((box?.height || 36) / scale)))} /></label>
+                  <label>高<input type="number" value={box ? Math.round(box.height / scale) : media[selected]?.height || 0} onChange={(event) => update(selected, clampMediaSize(media[selected]?.width || Math.round((box?.width || 48) / scale), Number(event.target.value)))} /></label>
+                  <p className="studio-note">这里的宽高是画面上量到的。上限 {MEDIA_MAX_WIDTH}×{MEDIA_MAX_HEIGHT}，超出的数值会按这个上限保存。没改过的照片和视频保持原位置。</p>
                 </>
               )}
             </>
