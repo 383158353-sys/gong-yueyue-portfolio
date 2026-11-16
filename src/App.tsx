@@ -992,7 +992,8 @@ function Navigation({
   onViewModeChange: (mode: ViewMode) => void
 }) {
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 px-4 py-4 sm:px-6 md:px-12">
+    <>
+    <header className="fixed left-0 right-0 top-0 z-[80] px-4 py-4 sm:px-6 md:px-12">
       <nav className="liquid-glass nav-shell mx-auto flex h-14 max-w-[1400px] items-center justify-between px-4">
         <Link className="animate-blur-fade-up text-sm font-semibold tracking-[0.14em] text-white" to="/" style={{ animationDelay: '0ms' }}>
           GONG YUEYUE / EMORE
@@ -1025,26 +1026,59 @@ function Navigation({
           className="animate-blur-fade-up liquid-glass nav-circle nav-toggle"
           style={{ animationDelay: '360ms' }}
           type="button"
-          onClick={() => setMenuOpen(!menuOpen)}
+          onClick={() => {
+            if (!menuOpen) {
+              const y = window.scrollY
+              document.body.dataset.menuScroll = String(y)
+              document.body.style.overflow = 'hidden'
+              setMenuOpen(true)
+              return
+            }
+            const y = Number(document.body.dataset.menuScroll || '0')
+            document.body.style.overflow = ''
+            delete document.body.dataset.menuScroll
+            setMenuOpen(false)
+            window.scrollTo(0, y)
+          }}
           aria-label="菜单"
         >
           <Menu className={`menu-icon ${menuOpen ? 'is-hidden' : ''}`} size={20} />
           <X className={`menu-icon is-x ${menuOpen ? 'is-open' : ''}`} size={20} />
         </button>
       </nav>
+    </header>
 
       <div className={`mobile-menu ${menuOpen ? 'is-open' : ''}`}>
         <VersionSwitch viewMode={viewMode} onViewModeChange={onViewModeChange} compact />
         {navItems.map((item, index) => (
-          <NavLink end={item.to === '/'} key={item.label} onClick={() => setMenuOpen(false)} style={{ transitionDelay: `${index * 45}ms` }} to={item.to}>
+          <NavLink
+            end={item.to === '/'}
+            key={item.label}
+            onClick={() => {
+              document.body.style.overflow = ''
+              delete document.body.dataset.menuScroll
+              setMenuOpen(false)
+            }}
+            style={{ transitionDelay: `${index * 45}ms` }}
+            to={item.to}
+          >
             {item.label}
           </NavLink>
         ))}
-        <a className="mobile-download-link" href="/assets/docs/gong-yueyue-portfolio.pdf" download onClick={() => setMenuOpen(false)}>
+        <a
+          className="mobile-download-link"
+          href="/assets/docs/gong-yueyue-portfolio.pdf"
+          download
+          onClick={() => {
+            document.body.style.overflow = ''
+            delete document.body.dataset.menuScroll
+            setMenuOpen(false)
+          }}
+        >
           下载作品集
         </a>
       </div>
-    </header>
+    </>
   )
 }
 
