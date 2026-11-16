@@ -43,7 +43,7 @@ export default function EditorToolbar() {
   return (
     <div className="editor-toolbar">
       <p className="pv-banner">
-        这是当前作品集的编辑页，不是另一张空白画布。导航、首页视频、WebGL 和场景轮播的播放不能拖动。卡片和文字可以选中、改字、调整顺序和图片缩放。未保存的草稿不会出现在公开栏目。发布后，变化出现在原来的首页、项目、场景等路由。
+        这是当前作品集的编辑页，不是另一张空白画布。导航、首页视频、WebGL 和场景轮播的播放不能拖动。打开「布局编辑」后，文字和项目卡片停在原位置，可以自由拖动、拖角改框，并出现吸附参考线。未打开时仍是原来的排版，也可以改字。未发布的草稿不会出现在公开栏目。发布后，宽屏页面使用新位置，手机仍按原来的顺序往下排。
       </p>
       <div className="pv-bar">
         {pages.map(([label, to]) => (
@@ -70,6 +70,7 @@ export default function EditorToolbar() {
       )}
       {site.unlocked && (
         <div className="pv-bar">
+          <button type="button" onClick={site.toggleLayout}>{site.layoutMode ? '退出布局编辑' : '布局编辑'}</button>
           <button type="button" onClick={site.undo}>撤销</button>
           <button type="button" onClick={site.redo}>重做</button>
           <button type="button" className="pv-danger" onClick={site.deleteSelected} disabled={!site.selected.length}>删除所选</button>
@@ -77,8 +78,6 @@ export default function EditorToolbar() {
           <button type="button" onClick={site.alignSelectedTogether} disabled={site.selected.length < 2}>彼此左对齐</button>
           <button type="button" onClick={() => site.alignText('left')}>文字左对齐</button>
           <button type="button" onClick={() => site.alignText('center')}>文字居中</button>
-          <button type="button" onClick={() => site.scaleSelected(0.1)}>放大图片</button>
-          <button type="button" onClick={() => site.scaleSelected(-0.1)}>缩小图片</button>
           <button type="button" onClick={() => void site.save()}>保存草稿</button>
           <button type="button" onClick={() => void site.publish()}>发布到公开栏目</button>
           <button type="button" onClick={() => void site.rollback()}>公开站回到原版</button>

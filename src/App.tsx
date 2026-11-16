@@ -13,9 +13,10 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { blockStyle, TextBind, useSite } from './content/siteContext'
+import { blockStyle, LayoutGuides, layoutRootStyle, placementStyle, TextBind, useSite } from './content/siteContext'
 import BoardRoute from './editor/BoardRoute'
 import EditorToolbar from './editor/EditorRoute'
+import './editor/editor.css'
 import { layoutSample } from './layoutSample'
 import GhostCursor from './components/GhostCursor/GhostCursor'
 import Lanyard from './components/Lanyard/Lanyard'
@@ -630,17 +631,18 @@ function App() {
 
         <div className="relative z-10 flex min-h-[100dvh] items-end px-4 pb-10 pt-24 sm:px-6 sm:pb-12 md:px-12 lg:pb-16">
           <div className="mx-auto w-full max-w-[1400px]">
-            <div className="hero-content max-w-5xl">
+            <div className="hero-content max-w-5xl" data-layout-root="home-hero" style={layoutRootStyle(site.override('root-home-hero')?.height, site.showPlacement && site.override('root-home-hero')?.height != null)}>
+              <LayoutGuides group="home-hero" />
               <p className="animate-blur-fade-up hero-eyebrow" style={{ animationDelay: '300ms' }}>
                 {editing && site.unlocked ? <TextBind id="home-eyebrow" group="home-hero" fallback="Emore / Graduation Portfolio 2026" /> : (site.override('home-eyebrow')?.text ?? 'Emore / Graduation Portfolio 2026')}
               </p>
 
               <h1 className="animate-blur-fade-up hero-title" style={{ animationDelay: '420ms' }}>
                 <span className="hero-title-en" style={blockStyle(site.override('home-title-en'))}>
-                  {editing && site.unlocked ? <TextBind id="home-title-en" group="home-hero" fallback="GongYueyue's Portfolio" /> : <BlurWords text={site.override('home-title-en')?.text ?? "GongYueyue's Portfolio"} split="word" delay={520} />}
+                {(editing && site.unlocked) || (site.showPlacement && site.override('home-title-en')?.x != null) ? <TextBind id="home-title-en" group="home-hero" fallback="GongYueyue's Portfolio" /> : <BlurWords text={site.override('home-title-en')?.text ?? "GongYueyue's Portfolio"} split="word" delay={520} />}
                 </span>
                 <span className="hero-title-cn" style={blockStyle(site.override('home-title-cn'))}>
-                  {editing && site.unlocked ? <TextBind id="home-title-cn" group="home-hero" fallback="龚玥月作品集" /> : <BlurWords text={site.override('home-title-cn')?.text ?? '龚玥月作品集'} split="char" delay={780} />}
+                {(editing && site.unlocked) || (site.showPlacement && site.override('home-title-cn')?.x != null) ? <TextBind id="home-title-cn" group="home-hero" fallback="龚玥月作品集" /> : <BlurWords text={site.override('home-title-cn')?.text ?? '龚玥月作品集'} split="char" delay={780} />}
                 </span>
               </h1>
 
@@ -661,14 +663,15 @@ function App() {
       </section>}
 
       {page === 'home' && <section className="relative z-10 border-y border-white/8 bg-[#060203] px-4 py-8 sm:px-6 md:px-12">
-        <div className="summary-strip-grid mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4">
+        <div className="summary-strip-grid mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4" data-layout-root="home-summary" style={layoutRootStyle(site.override('root-home-summary')?.height, site.showPlacement && site.override('root-home-summary')?.height != null)}>
+          <LayoutGuides group="home-summary" />
           {sectionSummaries.map(([title, summary], index) => ({ title, summary, index, id: `home-summary-${index}` }))
             .filter(({ id }) => editing || !site.override(id)?.hidden)
             .sort((a, b) => (site.override(a.id)?.order ?? a.index) - (site.override(b.id)?.order ?? b.index))
             .map(({ title, summary, index, id }) => (
             <div
               className={`reveal summary-tile spotlight-surface ${editing && site.unlocked ? 'edit-block' : ''} ${site.selected.includes(id) ? 'is-selected' : ''} ${site.guideId === id ? 'is-guide' : ''} ${site.override(id)?.hidden ? 'is-hidden-block' : ''}`}
-              style={{ transitionDelay: `${index * 70}ms`, order: site.override(id)?.order ?? index, ...blockStyle(site.override(id)) }}
+              style={{ transitionDelay: `${index * 70}ms`, order: site.override(id)?.order ?? index, ...blockStyle(site.override(id)), ...placementStyle(site.override(id), site.showPlacement) }}
               data-block-id={editing && site.unlocked ? id : undefined}
               data-group={editing && site.unlocked ? 'home-summary' : undefined}
               data-order={site.override(id)?.order ?? index}
@@ -718,7 +721,8 @@ function App() {
             </div>
           </div>
 
-          <div className="portfolio-card-grid film-project-grid mt-12">
+          <div className="portfolio-card-grid film-project-grid mt-12" data-layout-root="films-cards" style={layoutRootStyle(site.override('root-films-cards')?.height, site.showPlacement && site.override('root-films-cards')?.height != null)}>
+            <LayoutGuides group="films-cards" />
             {filmWorks.map((item, index) => ({ item, index })).sort((a, b) => (site.override(`films-card-${a.index}`)?.order ?? a.index) - (site.override(`films-card-${b.index}`)?.order ?? b.index)).filter(({ index }) => editing || !site.override(`films-card-${index}`)?.hidden).map(({ item, index }) => (
               <WorkCard key={item.title} blockId={`films-card-${index}`} group="films-cards" item={item} index={index} onOpen={() => setActiveWork(item)} />
             ))}
@@ -790,7 +794,8 @@ function App() {
             </div>
           </div>
 
-          <div className="portfolio-card-grid mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <div className="portfolio-card-grid mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4" data-layout-root="scenes-cards" style={layoutRootStyle(site.override('root-scenes-cards')?.height, site.showPlacement && site.override('root-scenes-cards')?.height != null)}>
+            <LayoutGuides group="scenes-cards" />
             {sceneWorks.map((item, index) => ({ item, index })).sort((a, b) => (site.override(`scenes-card-${a.index}`)?.order ?? a.index) - (site.override(`scenes-card-${b.index}`)?.order ?? b.index)).filter(({ index }) => editing || !site.override(`scenes-card-${index}`)?.hidden).map(({ item, index }) => (
               <WorkCard key={item.title} blockId={`scenes-card-${index}`} group="scenes-cards" item={item} index={index} onOpen={() => setActiveWork(item)} />
             ))}
@@ -811,7 +816,8 @@ function App() {
                 旧作品集中保留了历史人物、原创话剧、影视造型基础、特效刀伤、民族妆造、艺人合作和时尚摄影等完整内容。网页中重新整理重点项目，让每一组人物造型都能以图像、角色和项目资料展开。
               </p>
             </div>
-            <div className="portfolio-card-grid grid gap-4 sm:grid-cols-2">
+            <div className="portfolio-card-grid grid gap-4 sm:grid-cols-2" data-layout-root="characters-cards" style={layoutRootStyle(site.override('root-characters-cards')?.height, site.showPlacement && site.override('root-characters-cards')?.height != null)}>
+              <LayoutGuides group="characters-cards" />
               {characterWorks.map((item, index) => ({ item, index })).sort((a, b) => (site.override(`characters-card-${a.index}`)?.order ?? a.index) - (site.override(`characters-card-${b.index}`)?.order ?? b.index)).filter(({ index }) => editing || !site.override(`characters-card-${index}`)?.hidden).map(({ item, index }) => (
                 <WorkCard key={item.title} blockId={`characters-card-${index}`} group="characters-cards" item={item} index={index} onOpen={() => setActiveWork(item)} />
               ))}
@@ -836,7 +842,8 @@ function App() {
                 ...creativeAssetGroups.collaboration.slice(0, 1),
               ]}
             />
-            <div className="portfolio-card-grid grid gap-4 sm:grid-cols-2">
+            <div className="portfolio-card-grid grid gap-4 sm:grid-cols-2" data-layout-root="projects-cards" style={layoutRootStyle(site.override('root-projects-cards')?.height, site.showPlacement && site.override('root-projects-cards')?.height != null)}>
+              <LayoutGuides group="projects-cards" />
               {creativeWorks.map((item, index) => ({ item, index })).sort((a, b) => (site.override(`projects-card-${a.index}`)?.order ?? a.index) - (site.override(`projects-card-${b.index}`)?.order ?? b.index)).filter(({ index }) => editing || !site.override(`projects-card-${index}`)?.hidden).map(({ item, index }) => (
                 <WorkCard key={item.title} blockId={`projects-card-${index}`} group="projects-cards" item={item} index={index} onOpen={() => setActiveWork(item)} />
               ))}
@@ -1304,7 +1311,8 @@ function SectionHeader({ id, title, body, titleClassName }: { id?: string; title
   const bodyBlock = id ? site.override(`${id}-body`) : undefined
   if (id && (titleBlock?.hidden || bodyBlock?.hidden) && !site.editing) return null
   return (
-    <div className="reveal max-w-3xl">
+    <div className="reveal max-w-3xl" data-layout-root={id} style={layoutRootStyle(id ? site.override(`root-${id}`)?.height : undefined, Boolean(id) && site.showPlacement && site.override(`root-${id}`)?.height != null)}>
+      {id && <LayoutGuides group={id} />}
       <h2 className={`section-title ${titleClassName ?? ''}`} style={blockStyle(titleBlock)}>
         {id ? <TextBind id={`${id}-title`} group={id} fallback={title} /> : title}
       </h2>
@@ -1402,13 +1410,17 @@ function WorkCard({ item, index, onOpen, blockId, group }: { item: WorkItem; ind
 
   return (
     <article
-      className={`reveal work-card spotlight-surface ${onOpen && !editing ? 'is-clickable' : ''} ${editing ? 'edit-block' : ''} ${site.selected.includes(blockId) ? 'is-selected' : ''} ${site.guideId === blockId ? 'is-guide' : ''} ${block?.hidden ? 'is-hidden-block' : ''}`}
-      style={{ transitionDelay: `${index * 55}ms`, order: block?.order ?? index }}
+      className={`reveal work-card spotlight-surface ${onOpen && !editing ? 'is-clickable' : ''} ${editing ? 'edit-block' : ''} ${placementStyle(block, site.showPlacement) ? 'is-placed' : ''} ${site.selected.includes(blockId) ? 'is-selected' : ''} ${site.guideId === blockId ? 'is-guide' : ''} ${block?.hidden ? 'is-hidden-block' : ''}`}
+      style={{ transitionDelay: `${index * 55}ms`, order: block?.order ?? index, ...placementStyle(block, site.showPlacement), ...(site.selected.includes(blockId) ? { zIndex: 8 } : {}) }}
       role={onOpen && !editing ? 'button' : undefined}
       tabIndex={onOpen && !editing ? 0 : undefined}
-      data-block-id={editing ? blockId : undefined}
-      data-group={editing ? group : undefined}
+      data-block-id={editing || placementStyle(block, site.showPlacement) ? blockId : undefined}
+      data-group={editing || placementStyle(block, site.showPlacement) ? group : undefined}
       data-order={block?.order ?? index}
+      data-x={block?.x}
+      data-y={block?.y}
+      data-width={block?.width}
+      data-height={block?.height}
       onClick={editing ? undefined : onOpen}
       onPointerDown={editing ? (event) => site.pointerDown(event, { id: blockId, group, order: block?.order ?? index }) : undefined}
       onKeyDown={handleKeyDown}
@@ -1418,7 +1430,7 @@ function WorkCard({ item, index, onOpen, blockId, group }: { item: WorkItem; ind
       {item.assets && (
         <div className="work-card-assets">
           {item.assets.slice(0, 4).map((asset, assetIndex) => (
-            <img src={asset} alt={`${title} 素材 ${assetIndex + 1}`} loading="lazy" key={asset} style={{ transform: `scale(${block?.imageScale ?? 1})` }} />
+            <img src={asset} alt={`${title} 素材 ${assetIndex + 1}`} loading="lazy" key={asset} />
           ))}
         </div>
       )}
@@ -1429,10 +1441,13 @@ function WorkCard({ item, index, onOpen, blockId, group }: { item: WorkItem; ind
       <h3 style={blockStyle(block)}>{title}</h3>
       <p className="role">{role}</p>
       <p className="detail">{detail}</p>
-      {onOpen && (
+      {onOpen && !editing && (
         <span className="work-card-action">
           查看项目资料 <ArrowRight size={16} />
         </span>
+      )}
+      {editing && site.layoutMode && site.selected.includes(blockId) && (
+        <button type="button" className="edit-resize" aria-label="拖动调整大小" onPointerDown={(event) => site.startResize(event, blockId)} />
       )}
     </article>
   )

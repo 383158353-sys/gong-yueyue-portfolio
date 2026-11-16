@@ -416,6 +416,12 @@ function validateSite(input) {
       if (typeof block.imageScale !== 'number' || block.imageScale < 0.6 || block.imageScale > 1.6) throw new Error('invalid_document')
       next.imageScale = Math.round(block.imageScale * 100) / 100
     }
+    for (const key of ['x', 'y', 'width', 'height']) {
+      if (block[key] != null) {
+        if (typeof block[key] !== 'number' || !Number.isFinite(block[key]) || block[key] < -400 || block[key] > 8000) throw new Error('invalid_document')
+        next[key] = Math.round(block[key])
+      }
+    }
     if (block.hidden != null) {
       if (typeof block.hidden !== 'boolean') throw new Error('invalid_document')
       next.hidden = block.hidden
