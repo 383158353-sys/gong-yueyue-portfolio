@@ -14,7 +14,12 @@ export type Box = {
 
 export type Guide = { type: 'v'; x: number } | { type: 'h'; y: number }
 
-export function snapPosition(el: Box, others: Box[], canvasW: number, canvasH: number) {
+export function snapThresholdForScale(scale: number) {
+  const safeScale = Math.max(scale, 0.2)
+  return Math.max(18, Math.round(16 / safeScale))
+}
+
+export function snapPosition(el: Box, others: Box[], canvasW: number, canvasH: number, threshold = SNAP_THRESHOLD) {
   const vStops = [0, canvasW / 2, canvasW]
   const hStops = [0, canvasH / 2, canvasH]
 
@@ -37,11 +42,11 @@ export function snapPosition(el: Box, others: Box[], canvasW: number, canvasH: n
 
   let snapX: number | null = null
   let guideX: number | null = null
-  let minDiffX = SNAP_THRESHOLD
+  let minDiffX = Number.POSITIVE_INFINITY
   vStops.forEach((stop) => {
     dV.forEach((edge) => {
       const diff = Math.abs(stop - edge.val)
-      if (diff < minDiffX) {
+      if (diff <= threshold && diff < minDiffX) {
         minDiffX = diff
         guideX = stop
         snapX = stop - edge.offset
@@ -51,11 +56,11 @@ export function snapPosition(el: Box, others: Box[], canvasW: number, canvasH: n
 
   let snapY: number | null = null
   let guideY: number | null = null
-  let minDiffY = SNAP_THRESHOLD
+  let minDiffY = Number.POSITIVE_INFINITY
   hStops.forEach((stop) => {
     dH.forEach((edge) => {
       const diff = Math.abs(stop - edge.val)
-      if (diff < minDiffY) {
+      if (diff <= threshold && diff < minDiffY) {
         minDiffY = diff
         guideY = stop
         snapY = stop - edge.offset
@@ -116,6 +121,15 @@ export function autoLayoutGrid<T extends LayoutElement>(elements: T[], canvasWid
   }
 
   return result
+}
+
+export function alignToCanvas(element: Box, canvasW: number, canvasH: number, mode: 'left' | 'right' | 'top' | 'bottom' | 'centerH' | 'centerV') {
+  if (mode === 'left') return { id: element.id, x: 0, y: element.y }
+  if (mode === 'right') return { id: element.id, x: Math.round(canvasW - element.width), y: element.y }
+  if (mode === 'top') return { id: element.id, x: element.x, y: 0 }
+  if (mode === 'bottom') return { id: element.id, x: element.x, y: Math.round(canvasH - element.height) }
+  if (mode === 'centerH') return { id: element.id, x: Math.round((canvasW - element.width) / 2), y: element.y }
+  return { id: element.id, x: element.x, y: Math.round((canvasH - element.height) / 2) }
 }
 
 export function alignSelection(elements: Box[], mode: 'left' | 'right' | 'top' | 'bottom' | 'centerH' | 'centerV') {

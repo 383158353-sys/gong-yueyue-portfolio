@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ElementBody } from './CanvasView'
-import { alignSelection, autoLayoutGrid, snapPosition } from './geometry'
+import { alignSelection, alignToCanvas, autoLayoutGrid, snapPosition, snapThresholdForScale } from './geometry'
 import type { Guide } from './geometry'
 import { emptyDocument, FONT_CHOICES } from './types'
 import type { CanvasDocument, CanvasElement } from './types'
@@ -201,11 +201,19 @@ export default function EditorRoute() {
         patch(origin.element.id, { width, height }, false)
         return
       }
-      let x = Math.round(Math.max(0, Math.min(document.width - origin.element.width, origin.element.x + dx)))
-      let y = Math.round(Math.max(0, Math.min(document.height - origin.element.height, origin.element.y + dy)))
-      const snap = snapPosition({ ...origin.element, x, y }, document.elements, document.width, document.height)
+      let x = Math.round(origin.element.x + dx)
+      let y = Math.round(origin.element.y + dy)
+      const snap = snapPosition(
+        { ...origin.element, x, y },
+        document.elements,
+        document.width,
+        document.height,
+        snapThresholdForScale(scale),
+      )
       if (snap.snapX !== null) x = snap.snapX
       if (snap.snapY !== null) y = snap.snapY
+      x = Math.round(Math.max(0, Math.min(document.width - origin.element.width, x)))
+      y = Math.round(Math.max(0, Math.min(document.height - origin.element.height, y)))
       setGuides(snap.guides)
       patch(origin.element.id, { x, y }, false)
     }
@@ -235,6 +243,66 @@ export default function EditorRoute() {
     history.current = { past: [...history.current.past, document], future: history.current.future.slice(1) }
     setDocument(next)
   }
+
+  const chosen = document.elements.filter((element) => selected.includes(element.id))
+
+  const deleteIds = (ids: string[]) => {
+    if (!ids.length) return
+    setDocument((current) => {
+      history.current = { past: [...history.current.past, current].slice(-40), future: [] }
+      return { ...current, elements: current.elements.filter((element) => !ids.includes(element.id)) }
+    })
+    setSelected([])
+    setStatus('已删除所选。可以撤销。删除要生效还需要保存草稿。')
+  }
+
+  const clearCanvas = () => {
+    if (!document.elements.length) return
+    if (!window.confirm('清空这张画布上的全部元素？可以撤销。公开页面不会改变。')) return
+    deleteIds(document.elements.map((element) => element.id))
+    setStatus('画布已清空。可以撤销。记得保存草稿。')
+  }
+
+  const alignCanvas = (mode: 'left' | 'centerH' | 'right' | 'top' | 'centerV' | 'bottom') => {
+    if (!chosen.length) {
+      setStatus('先选中一个元素，再对齐到画布。')
+      return
+    }
+    patchMany(chosen.map((element) => {
+      const next = alignToCanvas(element, document.width, document.height, mode)
+      return { id: element.id, changes: { x: next.x, y: next.y } }
+    }))
+  }
+
+  const alignEachOther = (mode: 'left' | 'centerH' | 'right' | 'top' | 'centerV' | 'bottom') => {
+    if (chosen.length < 2) {
+      setStatus('彼此对齐需要至少选中两个元素。只选中一个时，请用对齐画布。')
+      return
+    }
+    const aligned = alignSelection(chosen, mode)
+    patchMany(aligned.map((item) => ({ id: item.id, changes: { x: item.x, y: item.y } })))
+  }
+
+  useEffect(() => {
+    if (!unlocked) return
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const typing = Boolean(target?.closest('input, textarea, select, [contenteditable="true"]'))
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && !typing) {
+        event.preventDefault()
+        if (event.shiftKey) redo()
+        else undo()
+        return
+      }
+      if (typing) return
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selected.length) {
+        event.preventDefault()
+        deleteIds(selected)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [unlocked, selected, document])
 
   const exportJson = () => {
     const link = window.document.createElement('a')
@@ -284,13 +352,14 @@ export default function EditorRoute() {
     <main className="pv-app">
       <p className="pv-banner">
         {storage === 'vercel-blob'
-          ? '草稿和图片写在这个项目的私人 Blob 里。刷新后重新输入凭证可以恢复。未点发布时，公开页面和 /board 不会改变。'
+          ? '草稿和图片写在这个项目的私人 Blob 里。刷新后重新输入凭证可以恢复。发布只更新 /board，不会改首页和其他六个栏目。'
           : '当前草稿写在这个开发服务的文件里，只供本机验收，不是云端。未点发布时，公开页面和 /board 不会改变。'}
       </p>
       <div className="pv-bar">
         <h1>私人画布</h1>
         <button type="button" onClick={undo}>撤销</button>
         <button type="button" onClick={redo}>重做</button>
+        <button type="button" className="pv-danger" onClick={() => deleteIds(selected)} disabled={!selected.length}>删除所选</button>
         <button type="button" onClick={() => void save()}>保存草稿</button>
         <button type="button" onClick={() => void publish()} disabled={dirty}>发布</button>
         <button type="button" onClick={exportJson}>导出 JSON</button>
@@ -319,16 +388,13 @@ export default function EditorRoute() {
           >
             网格排版
           </button>
-          <button type="button" onClick={() => {
-            const chosen = document.elements.filter((element) => selected.includes(element.id))
-            if (chosen.length < 2) return
-            const aligned = alignSelection(chosen, 'left')
-            patchMany(aligned.map((item) => ({ id: item.id, changes: { x: item.x, y: item.y } })))
-          }}>左对齐所选</button>
-          <button type="button" onClick={() => {
-            if (!current) return
-            patch(current.id, { x: Math.round((document.width - current.width) / 2) })
-          }}>水平居中画布</button>
+          <p className="pv-hint">只选中一个时，对齐相对整张画布。选中两个以上时，彼此对齐才让它们互相贴边。</p>
+          <button type="button" onClick={() => alignCanvas('left')}>左对齐画布</button>
+          <button type="button" onClick={() => alignCanvas('centerH')}>水平居中画布</button>
+          <button type="button" onClick={() => alignCanvas('right')}>右对齐画布</button>
+          <button type="button" onClick={() => alignEachOther('left')} disabled={chosen.length < 2}>彼此左对齐</button>
+          <button type="button" className="pv-danger" onClick={() => deleteIds(selected)} disabled={!selected.length}>删除所选</button>
+          <button type="button" onClick={clearCanvas}>清空画布</button>
           <button type="button" onClick={() => {
             if (!current) return
             patch(current.id, { rotation: ((current.rotation || 0) + 90) % 360 })
@@ -372,9 +438,9 @@ export default function EditorRoute() {
             ))}
             {guides.map((guide) =>
               guide.type === 'v' ? (
-                <i key={`v${guide.x}`} className="pv-guide-v" style={{ left: guide.x }} />
+                <i key={`v${guide.x}`} className="pv-guide-v" data-guide="v" style={{ left: guide.x }} />
               ) : (
-                <i key={`h${guide.y}`} className="pv-guide-h" style={{ top: guide.y }} />
+                <i key={`h${guide.y}`} className="pv-guide-h" data-guide="h" style={{ top: guide.y }} />
               ),
             )}
           </div>

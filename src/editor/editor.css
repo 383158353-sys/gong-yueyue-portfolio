@@ -143,20 +143,34 @@
 .pv-guide-v,
 .pv-guide-h {
   position: absolute;
-  background: #ffd0c6;
+  z-index: 30;
+  background: #ffd2c4;
+  box-shadow: 0 0 0 1px #ff5a4a;
   pointer-events: none;
 }
 
 .pv-guide-v {
   top: 0;
   bottom: 0;
-  width: 1px;
+  width: 2px;
 }
 
 .pv-guide-h {
   left: 0;
   right: 0;
-  height: 1px;
+  height: 2px;
+}
+
+.pv-danger {
+  border-color: #ff5a4a;
+  color: #ffd2c4;
+}
+
+.pv-hint {
+  margin: 4px 0;
+  color: #d9c2ba;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .pv-props label,

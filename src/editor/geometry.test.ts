@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { alignSelection, autoLayoutGrid, snapPosition } from './geometry.ts'
+import { alignSelection, alignToCanvas, autoLayoutGrid, snapPosition, snapThresholdForScale } from './geometry.ts'
 
 test('snap pulls a nearby edge and ignores a distant one', () => {
   const near = snapPosition(
@@ -46,7 +46,17 @@ test('grid keeps text above images and equal image columns', () => {
   assert.equal(tall.height, Math.round(tall.width * 3))
 })
 
-test('multi-select alignment shares the selection edge', () => {
+test('snap includes the threshold boundary and ignores one pixel beyond it', () => {
+  const edge = snapPosition({ id: 'a', x: 6, y: 40, width: 100, height: 40 }, [], 1200, 1600, 6)
+  assert.equal(edge.snapX, 0)
+  const beyond = snapPosition({ id: 'a', x: 7, y: 40, width: 100, height: 40 }, [], 1200, 1600, 6)
+  assert.equal(beyond.snapX, null)
+  assert.equal(snapThresholdForScale(0.5) >= 18, true)
+})
+
+test('one element aligns to the canvas, several align to each other', () => {
+  const alone = alignToCanvas({ id: 'a', x: 40, y: 20, width: 100, height: 50 }, 1200, 1600, 'left')
+  assert.deepEqual(alone, { id: 'a', x: 0, y: 20 })
   const aligned = alignSelection(
     [
       { id: 'a', x: 10, y: 10, width: 40, height: 20 },
