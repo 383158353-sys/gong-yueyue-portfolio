@@ -96,6 +96,63 @@ export function visibleMediaSize(element: HTMLElement) {
   return { width: Math.round(rect.width), height: Math.round(rect.height) }
 }
 
+type DraftBlock = { id: string; text?: string }
+
+function visibleText(element: HTMLElement) {
+  const words = [...element.querySelectorAll('.blur-token.is-word')]
+  if (words.length) return words.map((node) => node.textContent || '').join(' ')
+  const chars = [...element.querySelectorAll('.blur-token.is-char')]
+  if (chars.length) return chars.map((node) => node.textContent || '').join('')
+  return (element.innerText || '').replace(/\s+/g, ' ').trim()
+}
+
+function CommitNumber({ label, value, onCommit }: { label: string; value: number; onCommit: (value: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const skipCommit = useRef(false)
+  const shown = draft ?? String(value)
+  const commit = () => {
+    if (skipCommit.current) {
+      skipCommit.current = false
+      setDraft(null)
+      return
+    }
+    const raw = (draft ?? String(value)).trim()
+    setDraft(null)
+    if (!/^-?\d+$/.test(raw) || Number(raw) === value) return
+    onCommit(Number(raw))
+  }
+  return (
+    <label>
+      {label}
+      <input
+        type="text"
+        inputMode="numeric"
+        aria-label={label}
+        autoComplete="off"
+        spellCheck={false}
+        value={shown}
+        onFocus={() => setDraft((current) => current ?? String(value))}
+        onChange={(event) => {
+          const next = event.target.value
+          if (next === '' || next === '-' || /^-?\d+$/.test(next)) setDraft(next)
+        }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            event.currentTarget.blur()
+          } else if (event.key === 'Escape') {
+            event.preventDefault()
+            skipCommit.current = true
+            setDraft(null)
+            event.currentTarget.blur()
+          }
+        }}
+      />
+    </label>
+  )
+}
+
 export default function Studio() {
   const site = useSite()
   const { pathname } = useLocation()
@@ -108,9 +165,29 @@ export default function Studio() {
   const [media, setMedia] = useState<MediaMap>({})
   const [selected, setSelected] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
-  const [box, setBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+  const [box, setBox] = useState<{ left: number; top: number; width: number; height: number; cssWidth: number; cssHeight: number } | null>(null)
   const mediaRef = useRef(media)
   mediaRef.current = media
+  const blocksRef = useRef<DraftBlock[]>([])
+  const hitRef = useRef<HTMLDivElement>(null)
+  const lastTextClick = useRef({ id: '', time: 0 })
+
+  const frameScale = () => {
+    const frame = frameRef.current
+    const rect = frame?.getBoundingClientRect()
+    if (!frame || !rect?.width) return scale
+    return rect.width / frame.offsetWidth
+  }
+
+  const applyDraftText = (doc: Document) => {
+    for (const block of blocksRef.current) {
+      if (typeof block.text !== 'string') continue
+      const node = doc.querySelector<HTMLElement>(`[data-edit-id="${block.id}"]`)
+      if (!node || node.isContentEditable) continue
+      if (visibleText(node) === block.text) continue
+      node.textContent = block.text
+    }
+  }
 
   const syncFrame = () => {
     const frame = frameRef.current
@@ -123,8 +200,27 @@ export default function Studio() {
       return
     }
     const rect = selectedNode.getBoundingClientRect()
-    setBox({ left: rect.left * scale, top: rect.top * scale, width: rect.width * scale, height: rect.height * scale })
+    setBox({
+      left: rect.left * scale,
+      top: rect.top * scale,
+      width: rect.width * scale,
+      height: rect.height * scale,
+      cssWidth: Math.round(rect.width),
+      cssHeight: Math.round(rect.height),
+    })
   }
+
+  useEffect(() => {
+    const labels = new Set(['水平', '垂直', '宽', '高'])
+    const onPointerDown = (event: PointerEvent) => {
+      const active = document.activeElement
+      if (!(active instanceof HTMLInputElement) || !labels.has(active.getAttribute('aria-label') || '')) return
+      if (event.target instanceof Node && active.contains(event.target)) return
+      active.blur()
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => window.removeEventListener('pointerdown', onPointerDown)
+  }, [])
 
   useEffect(() => {
     const node = stageRef.current
@@ -138,8 +234,35 @@ export default function Studio() {
     if (!site.unlocked) return
     void fetch('/api/editor?action=site-draft')
       .then((response) => response.json())
-      .then((payload) => setMedia(payload.media || {}))
+      .then((payload) => {
+        blocksRef.current = Array.isArray(payload.blocks) ? payload.blocks : []
+        setMedia(payload.media || {})
+        const doc = frameRef.current?.contentDocument
+        if (doc) applyDraftText(doc)
+      })
   }, [site.unlocked])
+
+  useEffect(() => {
+    const node = hitRef.current
+    if (!node || preview) return
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const doc = frameRef.current?.contentDocument
+      const win = frameRef.current?.contentWindow
+      if (!doc || !win) return
+      doc.documentElement.style.scrollBehavior = 'auto'
+      win.scrollBy({ top: event.deltaY, left: event.deltaX, behavior: 'auto' })
+      syncFrame()
+    }
+    node.addEventListener('wheel', onWheel, { passive: false })
+    return () => node.removeEventListener('wheel', onWheel)
+  }, [preview, site.unlocked, selected, scale, media])
+
+  useEffect(() => {
+    const doc = frameRef.current?.contentDocument
+    if (!doc) return
+    doc.querySelectorAll('video').forEach((video) => { video.controls = preview })
+  }, [preview, pageId])
 
   useEffect(() => {
     syncFrame()
@@ -166,9 +289,83 @@ export default function Studio() {
 
   const pointerOnFrame = (event: ReactPointerEvent) => {
     const frame = frameRef.current
-    const rect = frame?.getBoundingClientRect()
-    if (!rect) return null
-    return { x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale }
+    if (!frame) return null
+    const rect = frame.getBoundingClientRect()
+    if (rect.width === 0) return null
+    const liveScale = rect.width / frame.offsetWidth
+    return { x: (event.clientX - rect.left) / liveScale, y: (event.clientY - rect.top) / liveScale, scale: liveScale }
+  }
+
+  const hitTarget = (doc: Document, x: number, y: number) => {
+    const stack = doc.elementsFromPoint(x, y)
+    for (const node of stack) {
+      if (!(node instanceof doc.defaultView!.HTMLElement)) continue
+      const found = node.closest<HTMLElement>('[data-edit-id]')
+      if (found) return found
+    }
+    let best: HTMLElement | null = null
+    let bestArea = Number.POSITIVE_INFINITY
+    for (const element of doc.querySelectorAll<HTMLElement>('[data-edit-id]')) {
+      const rect = element.getBoundingClientRect()
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue
+      const area = rect.width * rect.height
+      if (area < bestArea) {
+        best = element
+        bestArea = area
+      }
+    }
+    return best
+  }
+
+  const saveText = async (id: string, text: string) => {
+    const draft = await fetch('/api/editor?action=site-draft')
+    const existing = await draft.json()
+    const blocks: DraftBlock[] = Array.isArray(existing.blocks) ? existing.blocks : []
+    const index = blocks.findIndex((block) => block.id === id)
+    if (index >= 0) blocks[index] = { ...blocks[index], text }
+    else blocks.push({ id, text })
+    blocksRef.current = blocks
+    await fetch('/api/editor?action=site-draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ blocks, pages: existing.pages || {}, media: mediaRef.current }),
+    })
+  }
+
+  const beginTextEdit = (element: HTMLElement) => {
+    const id = element.getAttribute('data-edit-id') || ''
+    const original = visibleText(element)
+    const originalHTML = element.innerHTML
+    element.textContent = original
+    element.contentEditable = 'true'
+    let cancel = false
+    const finish = () => {
+      element.removeEventListener('blur', finish)
+      element.contentEditable = 'false'
+      if (cancel) {
+        element.innerHTML = originalHTML
+        return
+      }
+      const next = (element.textContent || '').replace(/\s+/g, ' ').trim()
+      if (next && next !== original) void saveText(id, next)
+      else element.innerHTML = originalHTML
+    }
+    window.setTimeout(() => {
+      if (!element.isConnected) return
+      element.focus()
+      const selection = element.ownerDocument.getSelection()
+      const range = element.ownerDocument.createRange()
+      range.selectNodeContents(element)
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      element.addEventListener('blur', finish)
+    }, 0)
+    element.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        cancel = true
+        element.blur()
+      }
+    })
   }
 
   const startMove = (event: ReactPointerEvent) => {
@@ -176,20 +373,32 @@ export default function Studio() {
     const point = pointerOnFrame(event)
     const doc = frameRef.current?.contentDocument
     if (!point || !doc) return
-    const hit = doc.elementFromPoint(point.x, point.y) as HTMLElement | null
-    const target = hit?.closest<HTMLElement>('[data-edit-id]') || null
+    const editingNode = doc.querySelector<HTMLElement>('[contenteditable="true"]')
+    const target = hitTarget(doc, point.x, point.y)
+    if (editingNode && editingNode !== target) editingNode.blur()
     if (!target) {
       setSelected(null)
       return
     }
-    event.preventDefault()
     const id = target.getAttribute('data-edit-id') || ''
+    const kind = target.getAttribute('data-edit-kind')
+    const now = performance.now()
+    if (kind === 'text' && (event.detail >= 2 || (lastTextClick.current.id === id && now - lastTextClick.current.time < 700))) {
+      setSelected(id)
+      beginTextEdit(target)
+      lastTextClick.current = { id: '', time: 0 }
+      return
+    }
+    lastTextClick.current = { id, time: now }
+    event.preventDefault()
     setSelected(id)
+    if (kind === 'text') return
+    const liveScale = point.scale
     const origin = { x: event.clientX, y: event.clientY, ...(mediaRef.current[id] || { dx: 0, dy: 0 }) }
     const move = (native: PointerEvent) => {
       update(id, {
-        dx: Math.round(origin.dx + (native.clientX - origin.x) / scale),
-        dy: Math.round(origin.dy + (native.clientY - origin.y) / scale),
+        dx: Math.round(origin.dx + (native.clientX - origin.x) / liveScale),
+        dy: Math.round(origin.dy + (native.clientY - origin.y) / liveScale),
       })
     }
     const end = () => {
@@ -216,8 +425,9 @@ export default function Studio() {
       height: current.height || rect?.height || 80,
     }
     const move = (native: PointerEvent) => {
-      const dx = (native.clientX - origin.x) / scale
-      const dy = (native.clientY - origin.y) / scale
+    const liveScale = frameScale()
+    const dx = (native.clientX - origin.x) / liveScale
+    const dy = (native.clientY - origin.y) / liveScale
       let { width, height, dx: nextX, dy: nextY } = origin
       if (corner === 'br') {
         width += dx
@@ -256,7 +466,7 @@ export default function Studio() {
     if (!doc) return []
     return [...doc.querySelectorAll<HTMLElement>('[data-edit-id]')].map((element) => ({
       id: element.getAttribute('data-edit-id') || '',
-      kind: element.tagName === 'VIDEO' ? '视频' : element.tagName === 'IFRAME' || element.classList.contains('yt-frame') ? '视频' : '图',
+      kind: element.getAttribute('data-edit-kind') === 'text' ? '字' : element.tagName === 'VIDEO' || element.classList.contains('yt-frame') ? '视频' : '图',
       name: element.getAttribute('alt') || element.getAttribute('title') || element.getAttribute('data-edit-id') || '',
     }))
   }
@@ -282,7 +492,15 @@ export default function Studio() {
           ))}
           <h2>这一页的媒体</h2>
           {list.map((item) => (
-            <button key={item.id} type="button" className={selected === item.id ? 'is-current' : ''} onClick={() => { setSelected(item.id); frameRef.current?.contentDocument?.querySelector(`[data-edit-id="${item.id}"]`)?.scrollIntoView({ block: 'center' }) }}>
+            <button key={item.id} type="button" className={selected === item.id ? 'is-current' : ''} onClick={() => {
+              setSelected(item.id)
+              const doc = frameRef.current?.contentDocument
+              const win = frameRef.current?.contentWindow
+              const node = doc?.querySelector<HTMLElement>(`[data-edit-id="${item.id}"]`)
+              if (!doc || !win || !node) return
+              doc.documentElement.style.scrollBehavior = 'auto'
+              win.scrollBy({ top: node.getBoundingClientRect().top - 80, behavior: 'auto' })
+            }}>
               {item.kind} {item.name}
             </button>
           ))}
@@ -297,20 +515,23 @@ export default function Studio() {
                 style={{ width: FRAME_WIDTH, height: 900, transform: `scale(${scale})`, transformOrigin: 'top left', border: 0, pointerEvents: preview ? 'auto' : 'none' }}
                 onLoad={() => {
                   const doc = frameRef.current?.contentDocument
-                  doc?.addEventListener('scroll', syncFrame, true)
+                  const win = frameRef.current?.contentWindow
+                  if (doc) {
+                    doc.documentElement.style.scrollBehavior = 'auto'
+                    doc.querySelectorAll('video').forEach((video) => { video.controls = preview })
+                    doc.addEventListener('scroll', syncFrame, true)
+                    applyDraftText(doc)
+                    window.setTimeout(() => applyDraftText(doc), 500)
+                  }
+                  if (win) win.scrollTo(0, 0)
                   setList(items())
                   syncFrame()
                 }}
               />
               {!preview && (
-                <div className="studio-hit" onPointerDown={startMove} onWheel={(event) => {
-                  const scroller = frameRef.current?.contentDocument?.scrollingElement
-                  if (!scroller) return
-                  scroller.scrollTop += event.deltaY
-                  syncFrame()
-                }}>
+                <div className="studio-hit" ref={hitRef} onPointerDown={startMove}>
                   {selected && box && (
-                    <div className="studio-select" style={{ left: box.left, top: box.top, width: box.width, height: box.height }} onPointerDown={(event) => { event.stopPropagation(); const id = selected; const origin = { x: event.clientX, y: event.clientY, ...(mediaRef.current[id] || { dx: 0, dy: 0 }) }; const move = (native: PointerEvent) => update(id, { dx: Math.round(origin.dx + (native.clientX - origin.x) / scale), dy: Math.round(origin.dy + (native.clientY - origin.y) / scale) }); const end = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end) }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', end) }}>
+                    <div className="studio-select" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
                       {(['tl', 'tr', 'bl', 'br'] as Corner[]).map((corner) => (
                         <button key={corner} type="button" className={`corner ${corner}`} aria-label={`拖动调整大小 ${corner}`} onPointerDown={(event) => startResize(event, corner)} />
                       ))}
@@ -345,11 +566,11 @@ export default function Studio() {
               {selected && (
                 <>
                   <p>{selected}</p>
-                  <label>水平<input type="number" value={media[selected]?.dx || 0} onChange={(event) => update(selected, { dx: Number(event.target.value) })} /></label>
-                  <label>垂直<input type="number" value={media[selected]?.dy || 0} onChange={(event) => update(selected, { dy: Number(event.target.value) })} /></label>
-                  <label>宽<input type="number" value={box ? Math.round(box.width / scale) : media[selected]?.width || 0} onChange={(event) => update(selected, clampMediaSize(Number(event.target.value), media[selected]?.height || Math.round((box?.height || 36) / scale)))} /></label>
-                  <label>高<input type="number" value={box ? Math.round(box.height / scale) : media[selected]?.height || 0} onChange={(event) => update(selected, clampMediaSize(media[selected]?.width || Math.round((box?.width || 48) / scale), Number(event.target.value)))} /></label>
-                  <p className="studio-note">这里的宽高是画面上量到的。上限 {MEDIA_MAX_WIDTH}×{MEDIA_MAX_HEIGHT}，超出的数值会按这个上限保存。没改过的照片和视频保持原位置。</p>
+                  <CommitNumber key={`${selected}-x`} label="水平" value={media[selected]?.dx ?? 0} onCommit={(next) => update(selected, { dx: Math.max(-4000, Math.min(4000, Math.round(next))) })} />
+                  <CommitNumber key={`${selected}-y`} label="垂直" value={media[selected]?.dy ?? 0} onCommit={(next) => update(selected, { dy: Math.max(-4000, Math.min(4000, Math.round(next))) })} />
+                  <CommitNumber key={`${selected}-w`} label="宽" value={media[selected]?.width ?? box?.cssWidth ?? 0} onCommit={(next) => update(selected, { width: Math.max(48, Math.min(MEDIA_MAX_WIDTH, Math.round(next))) })} />
+                  <CommitNumber key={`${selected}-h`} label="高" value={media[selected]?.height ?? box?.cssHeight ?? 0} onCommit={(next) => update(selected, { height: Math.max(36, Math.min(MEDIA_MAX_HEIGHT, Math.round(next))) })} />
+                  <p className="studio-note">Ctrl+A 后输入完整数字，Enter 或离开输入框才改画面，Esc 取消。输入过程中不会钳制。提交后宽高上限 {MEDIA_MAX_WIDTH}×{MEDIA_MAX_HEIGHT}，位置在 ±4000 内。没改过的照片和视频保持原位置。</p>
                 </>
               )}
             </>

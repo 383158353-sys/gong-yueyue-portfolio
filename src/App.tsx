@@ -659,15 +659,15 @@ function App() {
           <div className="mx-auto w-full max-w-[1400px]">
             <div className="hero-content max-w-5xl" data-layout-root="home-hero" style={layoutRootStyle(site.override('root-home-hero')?.height, site.showPlacement && site.override('root-home-hero')?.height != null)}>
               <LayoutGuides group="home-hero" />
-              <p className="animate-blur-fade-up hero-eyebrow" style={{ animationDelay: '300ms' }}>
+              <p className="animate-blur-fade-up hero-eyebrow" data-edit-id="home-eyebrow" data-edit-kind="text" style={{ animationDelay: '300ms' }}>
                 {editing && site.unlocked ? <TextBind id="home-eyebrow" group="home-hero" fallback="Emore / Graduation Portfolio 2026" /> : (site.override('home-eyebrow')?.text ?? 'Emore / Graduation Portfolio 2026')}
               </p>
 
               <h1 className="animate-blur-fade-up hero-title" style={{ animationDelay: '420ms' }}>
-                <span className="hero-title-en" style={blockStyle(site.override('home-title-en'))}>
+                <span className="hero-title-en" data-edit-id="home-title-en" data-edit-kind="text" style={blockStyle(site.override('home-title-en'))}>
                 {(editing && site.unlocked) || (site.showPlacement && site.override('home-title-en')?.x != null) ? <TextBind id="home-title-en" group="home-hero" fallback="GongYueyue's Portfolio" /> : <BlurWords text={site.override('home-title-en')?.text ?? "GongYueyue's Portfolio"} split="word" delay={520} />}
                 </span>
-                <span className="hero-title-cn" style={blockStyle(site.override('home-title-cn'))}>
+                <span className="hero-title-cn" data-edit-id="home-title-cn" data-edit-kind="text" style={blockStyle(site.override('home-title-cn'))}>
                 {(editing && site.unlocked) || (site.showPlacement && site.override('home-title-cn')?.x != null) ? <TextBind id="home-title-cn" group="home-hero" fallback="龚玥月作品集" /> : <BlurWords text={site.override('home-title-cn')?.text ?? '龚玥月作品集'} split="char" delay={780} />}
                 </span>
               </h1>
@@ -708,9 +708,9 @@ function App() {
               {(editing && site.unlocked) || placedTitle ? (
                 <TextBind id={id} group="home-summary" fallback={title} className="text-lg tracking-[-0.03em] text-white" />
               ) : (
-                <p className="text-lg tracking-[-0.03em] text-white">{site.override(id)?.text ?? title}</p>
+                <p className="text-lg tracking-[-0.03em] text-white" data-edit-id={id} data-edit-kind="text">{site.override(id)?.text ?? title}</p>
               )}
-              <p className="mt-3 text-sm leading-6 text-white/58">{site.override(id)?.detail ?? summary}</p>
+              <p className="mt-3 text-sm leading-6 text-white/58" data-edit-id={`${id}-detail`} data-edit-kind="text">{site.override(id)?.detail ?? summary}</p>
             </div>
             )
           })}
@@ -738,7 +738,7 @@ function App() {
                   <span>毕业设计</span>
                   <span>视听风格设定</span>
                 </div>
-                <h3 className="mt-4 text-3xl tracking-[-0.04em] sm:text-5xl">《剩余维度》</h3>
+                <h3 className="mt-4 text-3xl tracking-[-0.04em] sm:text-5xl" data-edit-id="films-feature-title" data-edit-kind="text">《剩余维度》</h3>
                 <p className="mt-4 max-w-3xl text-base leading-8 text-white/64">
                   这是一次寻找意义的旅程：从意识的探索，到宿命的揭示；从文字到影像，从想象到现实。
                 </p>
@@ -1346,10 +1346,10 @@ function SectionHeader({ id, title, body, titleClassName }: { id?: string; title
   return (
     <div className="reveal max-w-3xl" data-layout-root={id} style={layoutRootStyle(id ? site.override(`root-${id}`)?.height : undefined, Boolean(id) && site.showPlacement && site.override(`root-${id}`)?.height != null)}>
       {id && <LayoutGuides group={id} />}
-      <h2 className={`section-title ${titleClassName ?? ''}`} style={blockStyle(titleBlock)}>
+      <h2 className={`section-title ${titleClassName ?? ''}`} data-edit-id={id ? `${id}-title` : undefined} data-edit-kind={id ? 'text' : undefined} style={blockStyle(titleBlock)}>
         {id ? <TextBind id={`${id}-title`} group={id} fallback={title} /> : title}
       </h2>
-      <p className="mt-4 text-base leading-7 text-white/62 sm:text-lg" style={blockStyle(bodyBlock)}>
+      <p className="mt-4 text-base leading-7 text-white/62 sm:text-lg" data-edit-id={id ? `${id}-body` : undefined} data-edit-kind={id ? 'text' : undefined} style={blockStyle(bodyBlock)}>
         {id ? <TextBind id={`${id}-body`} group={id} fallback={body} /> : body}
       </p>
     </div>
@@ -1471,7 +1471,7 @@ function WorkCard({ item, index, onOpen, blockId, group }: { item: WorkItem; ind
         <Sparkles size={19} className="text-[var(--accent)]" />
         <span className="text-xs text-white/42">SOURCE MATERIALS</span>
       </div>
-      <h3 style={blockStyle(block)}>{title}</h3>
+      <h3 data-edit-id={`${blockId}-title`} data-edit-kind="text" style={blockStyle(block)}>{title}</h3>
       <p className="role">{role}</p>
       <p className="detail">{detail}</p>
       {onOpen && !editing && (

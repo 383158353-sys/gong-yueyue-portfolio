@@ -371,9 +371,15 @@
 
 .studio-body {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 260px;
+  grid-template-columns: 168px minmax(0, 1fr) 220px;
   min-height: 0;
   flex: 1;
+}
+
+@media (min-width: 1600px) {
+  .studio-body {
+    grid-template-columns: 220px minmax(0, 1fr) 300px;
+  }
 }
 
 .studio-side,
@@ -432,6 +438,7 @@
   position: absolute;
   outline: 2px solid #ff5a4a;
   cursor: move;
+  pointer-events: none;
 }
 
 .studio-select .corner {
@@ -520,7 +527,36 @@
   border-radius: 8px;
   background: #1b1013;
   color: white;
-  padding: 8px;
+  padding: 8px 10px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.studio-props textarea {
+  min-height: 96px;
+  font-size: 18px;
+}
+
+@media (min-width: 1600px) {
+  .studio-props label {
+    font-size: 16px;
+  }
+
+  .studio-props input,
+  .studio-props select {
+    font-size: 20px;
+    padding: 10px 12px;
+  }
+
+  .studio-props textarea {
+    font-size: 22px;
+  }
+}
+
+[data-edit-kind='text'][contenteditable='true'] {
+  outline: 2px solid #ff5a4a;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: text;
 }
 
 .studio-note {
