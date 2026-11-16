@@ -250,6 +250,12 @@ export async function handleEditorRequest({ method, url, headers, body, env }) {
     return json(200, { configured: true, document: await config.store.read('published.json') })
   }
 
+  if (upper === 'GET' && action === 'site-published') {
+    if (!config.configured) return json(200, { configured: false, blocks: [] })
+    const document = await config.store.read('site-published.json')
+    return json(200, { configured: true, blocks: document?.blocks || [] })
+  }
+
   if (upper === 'GET' && action === 'public-media') {
     if (!config.configured) return json(404, { error: 'not_found' })
     const id = new URL(url, 'http://editor.local').searchParams.get('id') || ''
@@ -330,7 +336,93 @@ export async function handleEditorRequest({ method, url, headers, body, env }) {
     return json(200, { ok: true })
   }
 
+  if (upper === 'GET' && action === 'site-draft') {
+    const document = await config.store.read('site-draft.json')
+    return json(200, { blocks: document?.blocks || [] })
+  }
+
+  if (upper === 'PUT' && action === 'site-draft') {
+    let payload
+    try {
+      payload = JSON.parse(Buffer.from(body || '').toString('utf8') || '{}')
+    } catch {
+      return json(400, { error: 'invalid_json' })
+    }
+    let document
+    try {
+      document = validateSite(payload)
+    } catch {
+      return json(400, { error: 'invalid_document' })
+    }
+    await config.store.write('site-draft.json', document)
+    return json(200, { ok: true })
+  }
+
+  if (upper === 'POST' && action === 'site-publish') {
+    const draft = await config.store.read('site-draft.json')
+    if (!draft) return json(400, { error: 'no_draft' })
+    await config.store.write('site-published.json', draft)
+    return json(200, { ok: true })
+  }
+
+  if (upper === 'POST' && action === 'site-rollback') {
+    await config.store.write('site-published.json', { blocks: [] })
+    return json(200, { ok: true })
+  }
+
   return json(404, { error: 'not_found' })
+}
+
+const SITE_ID = /^[a-z0-9-]{3,80}$/
+
+function validateSite(input) {
+  if (!input || !Array.isArray(input.blocks) || input.blocks.length > 400) throw new Error('invalid_document')
+  const blocks = input.blocks.map((block) => {
+    if (!block || !SITE_ID.test(block.id || '')) throw new Error('invalid_document')
+    const next = { id: block.id }
+    if (block.text != null) {
+      if (typeof block.text !== 'string' || block.text.length > 2000) throw new Error('invalid_document')
+      next.text = block.text
+    }
+    if (block.extra != null) {
+      if (typeof block.extra !== 'string' || block.extra.length > 500) throw new Error('invalid_document')
+      next.extra = block.extra
+    }
+    if (block.detail != null) {
+      if (typeof block.detail !== 'string' || block.detail.length > 2000) throw new Error('invalid_document')
+      next.detail = block.detail
+    }
+    if (block.order != null) {
+      if (!Number.isInteger(block.order) || block.order < 0 || block.order > 500) throw new Error('invalid_document')
+      next.order = block.order
+    }
+    if (block.align != null) {
+      if (!['left', 'center', 'right'].includes(block.align)) throw new Error('invalid_document')
+      next.align = block.align
+    }
+    if (block.fontSize != null) {
+      if (typeof block.fontSize !== 'number' || block.fontSize < 12 || block.fontSize > 120) throw new Error('invalid_document')
+      next.fontSize = block.fontSize
+    }
+    if (block.fontWeight != null) {
+      if (![400, 700].includes(block.fontWeight)) throw new Error('invalid_document')
+      next.fontWeight = block.fontWeight
+    }
+    if (block.color != null) {
+      if (typeof block.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(block.color)) throw new Error('invalid_document')
+      next.color = block.color
+    }
+    if (block.imageScale != null) {
+      if (typeof block.imageScale !== 'number' || block.imageScale < 0.6 || block.imageScale > 1.6) throw new Error('invalid_document')
+      next.imageScale = Math.round(block.imageScale * 100) / 100
+    }
+    if (block.hidden != null) {
+      if (typeof block.hidden !== 'boolean') throw new Error('invalid_document')
+      next.hidden = block.hidden
+    }
+    return next
+  })
+  return { blocks }
 }
 
 export async function handleNodeRequest(req, res, env = process.env) {

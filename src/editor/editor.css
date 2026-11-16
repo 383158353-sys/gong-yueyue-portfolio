@@ -232,3 +232,39 @@
     margin-left: 0;
   }
 }
+
+.editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: #14090c;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.editor-toolbar .pv-bar a {
+  color: white;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 7px 12px;
+}
+
+.editor-toolbar .pv-bar a.is-current {
+  background: #e10600;
+  border-color: #e10600;
+}
+
+.is-hidden-block {
+  opacity: 0.35;
+}
+
+.edit-block.is-selected {
+  outline: 2px solid #ff5a4a;
+  outline-offset: 4px;
+}
+
+.edit-block.is-snap-target,
+.edit-block.is-guide {
+  outline: 2px solid #ffd2c4;
+  box-shadow: -3px 0 0 #ff5a4a;
+}

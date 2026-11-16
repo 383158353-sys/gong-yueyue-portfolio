@@ -1,48 +1,18 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ScaledBoard, StackedBoard } from './CanvasView'
-import type { CanvasDocument } from './types'
 import './editor.css'
 
 export default function BoardRoute() {
-  const [document, setDocument] = useState<CanvasDocument | null>(null)
-  const [narrow, setNarrow] = useState(() => window.innerWidth < 768)
-
-  useEffect(() => {
-    const onResize = () => setNarrow(window.innerWidth < 768)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-
-  useEffect(() => {
-    let active = true
-    fetch('/api/editor?action=published')
-      .then((response) => response.json())
-      .then((payload) => {
-        if (active) setDocument(payload.document || null)
-      })
-      .catch(() => {
-        if (active) setDocument(null)
-      })
-    return () => {
-      active = false
-    }
-  }, [])
-
   return (
     <main className="pv-app">
       <div className="pv-bar">
-        <h1>已发布画布</h1>
-        <Link to="/">返回作品集</Link>
+        <h1>发布出口在原来的栏目</h1>
+        <Link to="/">首页</Link>
+        <Link to="/projects">项目</Link>
+        <Link to="/scenes">场景</Link>
+        <Link to="/editor">编辑作品集</Link>
       </div>
       <div className="pv-board">
-        {!document || document.elements.length === 0 ? (
-          <p className="pv-empty">这张画布还没有发布。首页、影片和其余六个栏目保持原来的内容。</p>
-        ) : narrow ? (
-          <StackedBoard document={document} />
-        ) : (
-          <ScaledBoard document={document} />
-        )}
+        <p className="pv-empty">作品集的发布稿显示在首页、关于、项目、影片、场景、人物和文章。这里不是另一套内容，也不是唯一出口。</p>
       </div>
     </main>
   )

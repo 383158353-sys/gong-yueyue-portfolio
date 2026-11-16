@@ -163,3 +163,30 @@ test('draft survives a new request, publish is separate, and strangers are rejec
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('site draft stays off the public pages until site publish', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'editor-site-'))
+  try {
+    const session = await call(dir, { method: 'POST', action: 'session', token: TOKEN })
+    const cookie = session.headers['set-cookie'].split(';')[0]
+    const blocks = [{ id: 'home-title-cn', text: '本地栏目改动' }]
+    const saved = await call(dir, { method: 'PUT', action: 'site-draft', cookie, body: { blocks } })
+    assert.equal(saved.status, 200)
+    const before = payload(await call(dir, { method: 'GET', action: 'site-published' }))
+    assert.deepEqual(before.blocks, [])
+    const published = await call(dir, { method: 'POST', action: 'site-publish', cookie })
+    assert.equal(published.status, 200)
+    const after = payload(await call(dir, { method: 'GET', action: 'site-published' }))
+    assert.equal(after.blocks[0].text, '本地栏目改动')
+    const canvas = payload(await call(dir, { method: 'GET', action: 'published' }))
+    assert.equal(canvas.document, null)
+    const rolled = await call(dir, { method: 'POST', action: 'site-rollback', cookie })
+    assert.equal(rolled.status, 200)
+    const restored = payload(await call(dir, { method: 'GET', action: 'site-published' }))
+    assert.deepEqual(restored.blocks, [])
+    const draft = payload(await call(dir, { method: 'GET', action: 'site-draft', cookie }))
+    assert.equal(draft.blocks[0].text, '本地栏目改动')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
