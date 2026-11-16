@@ -15,7 +15,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { blockStyle, LayoutGuides, layoutRootStyle, placementStyle, TextBind, useSite } from './content/siteContext'
 import BoardRoute from './editor/BoardRoute'
-import EditorToolbar from './editor/EditorRoute'
+import Studio, { PublishedCanvas } from './editor/Studio'
+import type { StudioPage } from './editor/pageSeed'
 import './editor/editor.css'
 import { layoutSample } from './layoutSample'
 import GhostCursor from './components/GhostCursor/GhostCursor'
@@ -550,6 +551,7 @@ function App() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [activeWork, setActiveWork] = useState<WorkItem | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode)
+  const [publishedPages, setPublishedPages] = useState<Record<string, StudioPage>>({})
   const { pathname } = useLocation()
   const site = useSite()
   const editing = pathname === '/editor' || pathname.startsWith('/editor/')
@@ -579,6 +581,22 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (editing) return
+    let active = true
+    fetch('/api/editor?action=site-published')
+      .then((response) => response.json())
+      .then((payload) => {
+        if (active) setPublishedPages(payload.pages || {})
+      })
+      .catch(() => {
+        if (active) setPublishedPages({})
+      })
+    return () => {
+      active = false
+    }
+  }, [editing, pathname])
+
+  useEffect(() => {
     if (!menuOpen) {
       document.body.style.overflow = ''
       return
@@ -590,15 +608,18 @@ function App() {
   }, [menuOpen])
 
   if (pathname === '/board') return <BoardRoute />
+  if (editing) return <Studio />
+  const canvasDoc = publishedPages[page]
+  const showOriginal = !canvasDoc?.elements?.length
 
   return (
     <>
-    {editing && <EditorToolbar />}
     <ClickSpark>
       <main className={`portfolio-shell portfolio-${viewMode} min-h-screen overflow-x-hidden bg-[#060203] text-white`} data-view-mode={viewMode}>
       <Navigation menuOpen={menuOpen} setMenuOpen={setMenuOpen} viewMode={viewMode} onViewModeChange={handleViewModeChange} />
 
-      {page === 'home' && <section id="home" ref={heroRef} className="hero-shell relative min-h-[100dvh] overflow-clip">
+      {!showOriginal && <PublishedCanvas doc={canvasDoc} stacked={viewMode === 'mobile'} />}
+      {showOriginal && page === 'home' && <section id="home" ref={heroRef} className="hero-shell relative min-h-[100dvh] overflow-clip">
         <BackgroundVideo src="/assets/home-bottom-video-no-subtitles.mp4" poster="/assets/stills/residual-altar.webp" />
         <div className="hero-frost-layer" aria-hidden="true" />
         <div className="hero-clarity-ring" aria-hidden="true" />
@@ -663,7 +684,7 @@ function App() {
         </div>
       </section>}
 
-      {page === 'home' && <section className="relative z-10 border-y border-white/8 bg-[#060203] px-4 py-8 sm:px-6 md:px-12">
+      {showOriginal && page === 'home' && <section className="relative z-10 border-y border-white/8 bg-[#060203] px-4 py-8 sm:px-6 md:px-12">
         <div className="summary-strip-grid mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4" data-layout-root="home-summary" data-layout-placing={site.showPlacement && site.override('root-home-summary')?.height != null ? 'true' : undefined} style={layoutRootStyle(site.override('root-home-summary')?.height, site.showPlacement && site.override('root-home-summary')?.height != null)}>
           <LayoutGuides group="home-summary" />
           {sectionSummaries.map(([title, summary], index) => ({ title, summary, index, id: `home-summary-${index}` }))
@@ -692,9 +713,9 @@ function App() {
         </div>
       </section>}
 
-      {page === 'films' && <YoutubeSample />}
+      {showOriginal && page === 'films' && <YoutubeSample />}
 
-      {page === 'films' && <>
+      {showOriginal && page === 'films' && <>
       <section id="films" className="section-block bg-[#100507]">
         <SectionMotionLayer image="/assets/stills/red-throne.webp" variant="film" />
         <div className="mx-auto max-w-[1400px]">
@@ -752,7 +773,7 @@ function App() {
       </section>
       </>}
 
-      {page === 'scenes' && <section id="scenes" className="section-block bg-[#100507]">
+      {showOriginal && page === 'scenes' && <section id="scenes" className="section-block bg-[#100507]">
         <SectionMotionLayer image="/assets/stills/dark-red-marsh.webp" variant="scene" />
         <div className="mx-auto max-w-[1400px]">
           <SectionHeader id="scenes" title="场景设计" body="通过 AI 场景生成、舞台效果图、模型和手绘训练，建立可叙事的空间系统。" />
@@ -808,7 +829,7 @@ function App() {
         </div>
       </section>}
 
-      {page === 'characters' && <section id="characters" className="section-block bg-[#0a0304]">
+      {showOriginal && page === 'characters' && <section id="characters" className="section-block bg-[#0a0304]">
         <SectionMotionLayer image={characterAssetGroups.styling[0]} variant="character" />
         <div className="mx-auto max-w-[1400px]">
           <SectionHeader id="characters" title="人物造型" body="从历史服化道到特效妆面，从戏剧人物到民族妆造，强调角色身份与影像质感。" />
@@ -831,7 +852,7 @@ function App() {
         </div>
       </section>}
 
-      {page === 'projects' && <section id="creative" className="section-block bg-[#100507]">
+      {showOriginal && page === 'projects' && <section id="creative" className="section-block bg-[#100507]">
         <SectionMotionLayer image={creativeAssetGroups.collaboration[0]} variant="creative" />
         <div className="mx-auto max-w-[1400px]">
           <SectionHeader id="projects" title="创意设计" body="把软件能力转化为风格表达，覆盖动态海报、视效合成、Blender 场景和跨媒介创作。" />
@@ -857,7 +878,7 @@ function App() {
         </div>
       </section>}
 
-      {page === 'about' && (
+      {showOriginal && page === 'about' && (
         <section className="section-block bg-[#100507]">
           <div className="mx-auto max-w-[1400px]">
             <SectionHeader id="about" title="关于" body="龚玥月 / Emore。影像美术、AI 短片、人物造型与创意设计。" />
@@ -870,7 +891,7 @@ function App() {
         </section>
       )}
 
-      {page === 'articles' && (
+      {showOriginal && page === 'articles' && (
         <section className="section-block bg-[#0a0304]">
           <div className="mx-auto max-w-[1400px]">
             <SectionHeader id="articles" title="文章" body="这里还没有文章。" />
@@ -878,7 +899,7 @@ function App() {
         </section>
       )}
 
-      {page === 'missing' && (
+      {showOriginal && page === 'missing' && (
         <section className="section-block bg-[#0a0304]">
           <div className="mx-auto max-w-[1400px]">
             <SectionHeader title="没有这一页" body="从顶部导航回到已有栏目。" />

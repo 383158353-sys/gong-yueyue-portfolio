@@ -251,9 +251,9 @@ export async function handleEditorRequest({ method, url, headers, body, env }) {
   }
 
   if (upper === 'GET' && action === 'site-published') {
-    if (!config.configured) return json(200, { configured: false, blocks: [] })
+    if (!config.configured) return json(200, { configured: false, blocks: [], pages: {} })
     const document = await config.store.read('site-published.json')
-    return json(200, { configured: true, blocks: document?.blocks || [] })
+    return json(200, { configured: true, blocks: document?.blocks || [], pages: document?.pages || {} })
   }
 
   if (upper === 'GET' && action === 'public-media') {
@@ -338,7 +338,7 @@ export async function handleEditorRequest({ method, url, headers, body, env }) {
 
   if (upper === 'GET' && action === 'site-draft') {
     const document = await config.store.read('site-draft.json')
-    return json(200, { blocks: document?.blocks || [] })
+    return json(200, { blocks: document?.blocks || [], pages: document?.pages || {} })
   }
 
   if (upper === 'PUT' && action === 'site-draft') {
@@ -428,7 +428,63 @@ function validateSite(input) {
     }
     return next
   })
-  return { blocks }
+  return { blocks, pages: validatePages(input.pages) }
+}
+
+const PAGE_KEYS = ['home', 'about', 'projects', 'films', 'scenes', 'characters', 'articles']
+const ASSET_URL = /^\/assets\/[a-z0-9./_-]+$/
+
+function validatePages(input) {
+  if (input == null) return {}
+  if (typeof input !== 'object' || Array.isArray(input)) throw new Error('invalid_document')
+  const pages = {}
+  for (const key of Object.keys(input)) {
+    if (!PAGE_KEYS.includes(key)) throw new Error('invalid_document')
+    const page = input[key]
+    if (!page || !Array.isArray(page.elements) || page.elements.length > 240) throw new Error('invalid_document')
+    const width = Number(page.width)
+    const height = Number(page.height)
+    if (!Number.isFinite(width) || width < 320 || width > 4000) throw new Error('invalid_document')
+    if (!Number.isFinite(height) || height < 240 || height > 12000) throw new Error('invalid_document')
+    pages[key] = {
+      width: Math.round(width),
+      height: Math.round(height),
+      elements: page.elements.map((element) => {
+        if (!element || !SITE_ID.test(element.id || '')) throw new Error('invalid_document')
+        if (!['image', 'video', 'text'].includes(element.type)) throw new Error('invalid_document')
+        const next = {
+          id: element.id,
+          type: element.type,
+          name: typeof element.name === 'string' ? element.name.slice(0, 80) : element.id,
+          x: num(element.x, -2000, 12000),
+          y: num(element.y, -2000, 12000),
+          width: num(element.width, 24, 4000),
+          height: num(element.height, 24, 4000),
+        }
+        if (element.url != null) {
+          if (typeof element.url !== 'string' || !ASSET_URL.test(element.url) || element.url.includes('..')) throw new Error('invalid_document')
+          next.url = element.url
+        }
+        if (element.text != null) {
+          if (typeof element.text !== 'string' || element.text.length > 2000) throw new Error('invalid_document')
+          next.text = element.text
+        }
+        if (element.fit != null) {
+          if (!['cover', 'contain'].includes(element.fit)) throw new Error('invalid_document')
+          next.fit = element.fit
+        }
+        if (element.fontSize != null) next.fontSize = num(element.fontSize, 12, 120)
+        return next
+      }),
+    }
+  }
+  return pages
+}
+
+function num(value, min, max) {
+  const number = Number(value)
+  if (!Number.isFinite(number) || number < min || number > max) throw new Error('invalid_document')
+  return Math.round(number)
 }
 
 export async function handleNodeRequest(req, res, env = process.env) {
