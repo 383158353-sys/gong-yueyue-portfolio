@@ -13,6 +13,10 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
+import { blockStyle, LayoutGuides, layoutRootStyle, placementStyle, TextBind, useSite } from './content/siteContext'
+import BoardRoute from './editor/BoardRoute'
+import Studio, { applyMedia, type MediaBox } from './editor/Studio'
+import './editor/editor.css'
 import { layoutSample } from './layoutSample'
 import GhostCursor from './components/GhostCursor/GhostCursor'
 import Lanyard from './components/Lanyard/Lanyard'
@@ -430,6 +434,7 @@ function getInitialViewMode(): ViewMode {
 
 function handleInteractivePointerMove(event: React.PointerEvent<HTMLElement>) {
   if (window.matchMedia('(pointer: coarse)').matches) return
+  if (event.currentTarget.classList.contains('is-placed')) return
   const element = event.currentTarget
   const rect = element.getBoundingClientRect()
   const x = (event.clientX - rect.left) / rect.width
@@ -545,8 +550,11 @@ function App() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [activeWork, setActiveWork] = useState<WorkItem | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode)
+  const [publishedMedia, setPublishedMedia] = useState<Record<string, MediaBox>>({})
   const { pathname } = useLocation()
-  const page = pathname === '/' ? 'home' : pathname.slice(1)
+  const site = useSite()
+  const editing = pathname === '/editor' || pathname.startsWith('/editor/')
+  const page = editing ? (pathname === '/editor' ? 'home' : pathname.slice('/editor/'.length)) : pathname === '/' ? 'home' : pathname.slice(1)
   const heroRef = useHeroParallax()
   useReveal(pathname)
 
@@ -572,6 +580,22 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (editing) return
+    let active = true
+    fetch('/api/editor?action=site-published')
+      .then((response) => response.json())
+      .then((payload) => {
+        if (active) setPublishedMedia(payload.media || {})
+      })
+      .catch(() => {
+        if (active) setPublishedMedia({})
+      })
+    return () => {
+      active = false
+    }
+  }, [editing, pathname])
+
+  useEffect(() => {
     if (!menuOpen) {
       document.body.style.overflow = ''
       return
@@ -582,7 +606,19 @@ function App() {
     }
   }, [menuOpen])
 
+  useEffect(() => {
+    if (editing || viewMode === 'mobile') {
+      applyMedia(document, {}, false)
+      return
+    }
+    applyMedia(document, publishedMedia, true)
+  }, [editing, viewMode, page, publishedMedia])
+
+  if (pathname === '/board') return <BoardRoute />
+  if (editing) return <Studio />
+
   return (
+    <>
     <ClickSpark>
       <main className={`portfolio-shell portfolio-${viewMode} min-h-screen overflow-x-hidden bg-[#060203] text-white`} data-view-mode={viewMode}>
       <Navigation menuOpen={menuOpen} setMenuOpen={setMenuOpen} viewMode={viewMode} onViewModeChange={handleViewModeChange} />
@@ -621,17 +657,18 @@ function App() {
 
         <div className="relative z-10 flex min-h-[100dvh] items-end px-4 pb-10 pt-24 sm:px-6 sm:pb-12 md:px-12 lg:pb-16">
           <div className="mx-auto w-full max-w-[1400px]">
-            <div className="hero-content max-w-5xl">
-              <p className="animate-blur-fade-up hero-eyebrow" style={{ animationDelay: '300ms' }}>
-                Emore / Graduation Portfolio 2026
+            <div className="hero-content max-w-5xl" data-layout-root="home-hero" style={layoutRootStyle(site.override('root-home-hero')?.height, site.showPlacement && site.override('root-home-hero')?.height != null)}>
+              <LayoutGuides group="home-hero" />
+              <p className="animate-blur-fade-up hero-eyebrow" data-edit-id="home-eyebrow" data-edit-kind="text" style={{ animationDelay: '300ms' }}>
+                {editing && site.unlocked ? <TextBind id="home-eyebrow" group="home-hero" fallback="Emore / Graduation Portfolio 2026" /> : (site.override('home-eyebrow')?.text ?? 'Emore / Graduation Portfolio 2026')}
               </p>
 
               <h1 className="animate-blur-fade-up hero-title" style={{ animationDelay: '420ms' }}>
-                <span className="hero-title-en">
-                  <BlurWords text="GongYueyue's Portfolio" split="word" delay={520} />
+                <span className="hero-title-en" data-edit-id="home-title-en" data-edit-kind="text" style={blockStyle(site.override('home-title-en'))}>
+                {(editing && site.unlocked) || (site.showPlacement && site.override('home-title-en')?.x != null) ? <TextBind id="home-title-en" group="home-hero" fallback="GongYueyue's Portfolio" /> : <BlurWords text={site.override('home-title-en')?.text ?? "GongYueyue's Portfolio"} split="word" delay={520} />}
                 </span>
-                <span className="hero-title-cn">
-                  <BlurWords text="龚玥月作品集" split="char" delay={780} />
+                <span className="hero-title-cn" data-edit-id="home-title-cn" data-edit-kind="text" style={blockStyle(site.override('home-title-cn'))}>
+                {(editing && site.unlocked) || (site.showPlacement && site.override('home-title-cn')?.x != null) ? <TextBind id="home-title-cn" group="home-hero" fallback="龚玥月作品集" /> : <BlurWords text={site.override('home-title-cn')?.text ?? '龚玥月作品集'} split="char" delay={780} />}
                 </span>
               </h1>
 
@@ -652,19 +689,31 @@ function App() {
       </section>}
 
       {page === 'home' && <section className="relative z-10 border-y border-white/8 bg-[#060203] px-4 py-8 sm:px-6 md:px-12">
-        <div className="summary-strip-grid mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4">
-          {sectionSummaries.map(([title, summary], index) => (
+        <div className="summary-strip-grid mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4" data-layout-root="home-summary" data-layout-placing={site.showPlacement && site.override('root-home-summary')?.height != null ? 'true' : undefined} style={layoutRootStyle(site.override('root-home-summary')?.height, site.showPlacement && site.override('root-home-summary')?.height != null)}>
+          <LayoutGuides group="home-summary" />
+          {sectionSummaries.map(([title, summary], index) => ({ title, summary, index, id: `home-summary-${index}` }))
+            .filter(({ id }) => editing || !site.override(id)?.hidden)
+            .sort((a, b) => (site.override(a.id)?.order ?? a.index) - (site.override(b.id)?.order ?? b.index))
+            .map(({ title, summary, index, id }) => {
+            const placedTitle = Boolean(placementStyle(site.override(id), site.showPlacement))
+            return (
             <div
               className="reveal summary-tile spotlight-surface"
               style={{ transitionDelay: `${index * 70}ms` }}
               onPointerMove={handleInteractivePointerMove}
               onPointerLeave={handleInteractivePointerLeave}
-              key={title}
+              key={id}
             >
-              <p className="text-lg tracking-[-0.03em] text-white">{title}</p>
-              <p className="mt-3 text-sm leading-6 text-white/58">{summary}</p>
+              {placedTitle && <p className="text-lg tracking-[-0.03em] text-white invisible" aria-hidden="true">{site.override(id)?.text ?? title}</p>}
+              {(editing && site.unlocked) || placedTitle ? (
+                <TextBind id={id} group="home-summary" fallback={title} className="text-lg tracking-[-0.03em] text-white" />
+              ) : (
+                <p className="text-lg tracking-[-0.03em] text-white" data-edit-id={id} data-edit-kind="text">{site.override(id)?.text ?? title}</p>
+              )}
+              <p className="mt-3 text-sm leading-6 text-white/58" data-edit-id={`${id}-detail`} data-edit-kind="text">{site.override(id)?.detail ?? summary}</p>
             </div>
-          ))}
+            )
+          })}
         </div>
       </section>}
 
@@ -675,20 +724,21 @@ function App() {
         <SectionMotionLayer image="/assets/stills/red-throne.webp" variant="film" />
         <div className="mx-auto max-w-[1400px]">
           <SectionHeader
+            id="films"
             title="短片作品"
             body="以《剩余维度》为核心，整合短片美术、服装化妆、数字动画和独立视效片段。"
           />
 
           <div className="film-feature-layout mt-10 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_420px]">
             <div className="reveal overflow-hidden rounded-[28px] border border-white/10 bg-[#16080a]">
-              <video className="aspect-video w-full bg-black object-cover" src="/assets/hero-trailer.mp4" poster="/assets/stills/residual-altar.webp" controls playsInline />
+              <video data-edit-id="films-trailer" data-edit-kind="video" className="aspect-video w-full bg-black object-cover" src="/assets/hero-trailer.mp4" poster="/assets/stills/residual-altar.webp" controls={!editing} playsInline />
               <div className="p-5 sm:p-8">
                 <div className="flex flex-wrap gap-3 text-sm text-white/58">
                   <span>AI 影像短片</span>
                   <span>毕业设计</span>
                   <span>视听风格设定</span>
                 </div>
-                <h3 className="mt-4 text-3xl tracking-[-0.04em] sm:text-5xl">《剩余维度》</h3>
+                <h3 className="mt-4 text-3xl tracking-[-0.04em] sm:text-5xl" data-edit-id="films-feature-title" data-edit-kind="text">《剩余维度》</h3>
                 <p className="mt-4 max-w-3xl text-base leading-8 text-white/64">
                   这是一次寻找意义的旅程：从意识的探索，到宿命的揭示；从文字到影像，从想象到现实。
                 </p>
@@ -701,9 +751,10 @@ function App() {
             </div>
           </div>
 
-          <div className="portfolio-card-grid film-project-grid mt-12">
-            {filmWorks.map((item, index) => (
-              <WorkCard key={item.title} item={item} index={index} onOpen={() => setActiveWork(item)} />
+          <div className="portfolio-card-grid film-project-grid mt-12" data-layout-root="films-cards" style={layoutRootStyle(site.override('root-films-cards')?.height, site.showPlacement && site.override('root-films-cards')?.height != null)}>
+            <LayoutGuides group="films-cards" />
+            {filmWorks.map((item, index) => ({ item, index })).sort((a, b) => (site.override(`films-card-${a.index}`)?.order ?? a.index) - (site.override(`films-card-${b.index}`)?.order ?? b.index)).filter(({ index }) => editing || !site.override(`films-card-${index}`)?.hidden).map(({ item, index }) => (
+              <WorkCard key={item.title} blockId={`films-card-${index}`} group="films-cards" item={item} index={index} onOpen={() => setActiveWork(item)} />
             ))}
           </div>
         </div>
@@ -712,7 +763,7 @@ function App() {
       <section className="section-block bg-[#0a0304]">
         <SectionMotionLayer image="/assets/stills/crowd-ritual.webp" variant="process" />
         <div className="mx-auto max-w-[1400px]">
-          <SectionHeader title="《剩余维度》制作流程" body="从世界观到成片输出，保留展板中的完整创作链路，并转化为网页叙事。" titleClassName="section-title-no-wrap" />
+          <SectionHeader id="films-process" title="《剩余维度》制作流程" body="从世界观到成片输出，保留展板中的完整创作链路，并转化为网页叙事。" titleClassName="section-title-no-wrap" />
           <div className="process-grid mt-10">
             {processSteps.map(([title, body], index) => (
               <div className="reveal process-step" style={{ transitionDelay: `${index * 45}ms` }} key={title}>
@@ -729,11 +780,11 @@ function App() {
       {page === 'scenes' && <section id="scenes" className="section-block bg-[#100507]">
         <SectionMotionLayer image="/assets/stills/dark-red-marsh.webp" variant="scene" />
         <div className="mx-auto max-w-[1400px]">
-          <SectionHeader title="场景设计" body="通过 AI 场景生成、舞台效果图、模型和手绘训练，建立可叙事的空间系统。" />
+          <SectionHeader id="scenes" title="场景设计" body="通过 AI 场景生成、舞台效果图、模型和手绘训练，建立可叙事的空间系统。" />
 
           <div className="scene-feature-layout mt-10 grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
             <button className="reveal image-stage" onClick={() => setLightbox(currentStill)} type="button">
-              <img src={currentStill.src} alt={currentStill.title} />
+              <img data-edit-id="scenes-feature" data-edit-kind="image" src={currentStill.src} alt={currentStill.title} />
               <div className="stage-copy">
                 <span>{currentStill.group}</span>
                 <h3>{currentStill.title}</h3>
@@ -766,16 +817,17 @@ function App() {
                     type="button"
                     aria-label={still.title}
                   >
-                    <img src={still.src} alt="" />
+                    <img data-edit-id={`scenes-thumb-${index}`} data-edit-kind="image" src={still.src} alt={still.title} />
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="portfolio-card-grid mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            {sceneWorks.map((item, index) => (
-              <WorkCard key={item.title} item={item} index={index} onOpen={() => setActiveWork(item)} />
+          <div className="portfolio-card-grid mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4" data-layout-root="scenes-cards" style={layoutRootStyle(site.override('root-scenes-cards')?.height, site.showPlacement && site.override('root-scenes-cards')?.height != null)}>
+            <LayoutGuides group="scenes-cards" />
+            {sceneWorks.map((item, index) => ({ item, index })).sort((a, b) => (site.override(`scenes-card-${a.index}`)?.order ?? a.index) - (site.override(`scenes-card-${b.index}`)?.order ?? b.index)).filter(({ index }) => editing || !site.override(`scenes-card-${index}`)?.hidden).map(({ item, index }) => (
+              <WorkCard key={item.title} blockId={`scenes-card-${index}`} group="scenes-cards" item={item} index={index} onOpen={() => setActiveWork(item)} />
             ))}
           </div>
         </div>
@@ -784,7 +836,7 @@ function App() {
       {page === 'characters' && <section id="characters" className="section-block bg-[#0a0304]">
         <SectionMotionLayer image={characterAssetGroups.styling[0]} variant="character" />
         <div className="mx-auto max-w-[1400px]">
-          <SectionHeader title="人物造型" body="从历史服化道到特效妆面，从戏剧人物到民族妆造，强调角色身份与影像质感。" />
+          <SectionHeader id="characters" title="人物造型" body="从历史服化道到特效妆面，从戏剧人物到民族妆造，强调角色身份与影像质感。" />
 
           <div className="character-feature-layout mt-10 grid gap-5 lg:grid-cols-[0.86fr_1.14fr]">
             <div className="reveal character-copy">
@@ -794,9 +846,10 @@ function App() {
                 旧作品集中保留了历史人物、原创话剧、影视造型基础、特效刀伤、民族妆造、艺人合作和时尚摄影等完整内容。网页中重新整理重点项目，让每一组人物造型都能以图像、角色和项目资料展开。
               </p>
             </div>
-            <div className="portfolio-card-grid grid gap-4 sm:grid-cols-2">
-              {characterWorks.map((item, index) => (
-                <WorkCard key={item.title} item={item} index={index} onOpen={() => setActiveWork(item)} />
+            <div className="portfolio-card-grid grid gap-4 sm:grid-cols-2" data-layout-root="characters-cards" style={layoutRootStyle(site.override('root-characters-cards')?.height, site.showPlacement && site.override('root-characters-cards')?.height != null)}>
+              <LayoutGuides group="characters-cards" />
+              {characterWorks.map((item, index) => ({ item, index })).sort((a, b) => (site.override(`characters-card-${a.index}`)?.order ?? a.index) - (site.override(`characters-card-${b.index}`)?.order ?? b.index)).filter(({ index }) => editing || !site.override(`characters-card-${index}`)?.hidden).map(({ item, index }) => (
+                <WorkCard key={item.title} blockId={`characters-card-${index}`} group="characters-cards" item={item} index={index} onOpen={() => setActiveWork(item)} />
               ))}
             </div>
           </div>
@@ -806,10 +859,11 @@ function App() {
       {page === 'projects' && <section id="creative" className="section-block bg-[#100507]">
         <SectionMotionLayer image={creativeAssetGroups.collaboration[0]} variant="creative" />
         <div className="mx-auto max-w-[1400px]">
-          <SectionHeader title="创意设计" body="把软件能力转化为风格表达，覆盖动态海报、视效合成、Blender 场景和跨媒介创作。" />
+          <SectionHeader id="projects" title="创意设计" body="把软件能力转化为风格表达，覆盖动态海报、视效合成、Blender 场景和跨媒介创作。" />
 
           <div className="creative-feature-layout mt-10 grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <SourceMosaic
+              editId="projects-mosaic"
               label="Canva source materials"
               title="从动态海报到综合视觉练习"
               body="旧版作品集中的平面、手绘、三维和摄影合作素材已拆出为独立图片，在网页中重新组织展示。"
@@ -819,9 +873,10 @@ function App() {
                 ...creativeAssetGroups.collaboration.slice(0, 1),
               ]}
             />
-            <div className="portfolio-card-grid grid gap-4 sm:grid-cols-2">
-              {creativeWorks.map((item, index) => (
-                <WorkCard key={item.title} item={item} index={index} onOpen={() => setActiveWork(item)} />
+            <div className="portfolio-card-grid grid gap-4 sm:grid-cols-2" data-layout-root="projects-cards" style={layoutRootStyle(site.override('root-projects-cards')?.height, site.showPlacement && site.override('root-projects-cards')?.height != null)}>
+              <LayoutGuides group="projects-cards" />
+              {creativeWorks.map((item, index) => ({ item, index })).sort((a, b) => (site.override(`projects-card-${a.index}`)?.order ?? a.index) - (site.override(`projects-card-${b.index}`)?.order ?? b.index)).filter(({ index }) => editing || !site.override(`projects-card-${index}`)?.hidden).map(({ item, index }) => (
+                <WorkCard key={item.title} blockId={`projects-card-${index}`} group="projects-cards" item={item} index={index} onOpen={() => setActiveWork(item)} />
               ))}
             </div>
           </div>
@@ -831,7 +886,7 @@ function App() {
       {page === 'about' && (
         <section className="section-block bg-[#100507]">
           <div className="mx-auto max-w-[1400px]">
-            <SectionHeader title="关于" body="龚玥月 / Emore。影像美术、AI 短片、人物造型与创意设计。" />
+            <SectionHeader id="about" title="关于" body="龚玥月 / Emore。影像美术、AI 短片、人物造型与创意设计。" />
             <div className="mt-8">
               <button className="liquid-glass glass-button" type="button" onClick={() => setProfileOpen(true)}>
                 个人简介 <User size={18} />
@@ -844,7 +899,7 @@ function App() {
       {page === 'articles' && (
         <section className="section-block bg-[#0a0304]">
           <div className="mx-auto max-w-[1400px]">
-            <SectionHeader title="文章" body="这里还没有文章。" />
+            <SectionHeader id="articles" title="文章" body="这里还没有文章。" />
           </div>
         </section>
       )}
@@ -876,6 +931,7 @@ function App() {
       {activeWork && <WorkDetailModal item={activeWork} onClose={() => setActiveWork(null)} onPreview={setLightbox} />}
       </main>
     </ClickSpark>
+    </>
   )
 }
 
@@ -1096,7 +1152,7 @@ function YoutubeSample() {
     <section className="section-block bg-[#0a0304]" data-layout-sample="true">
       <div className="mx-auto max-w-[1400px]">
         <SectionHeader title={layoutSample.label} body={layoutSample.note} />
-        <div className="yt-frame mt-8">
+        <div className="yt-frame mt-8" data-edit-id="films-youtube" data-edit-kind="video" title="测试视频">
           <iframe
             src={layoutSample.embedUrl}
             title={layoutSample.label}
@@ -1270,6 +1326,8 @@ function BackgroundVideo({ src, poster }: { src: string; poster: string }) {
   return (
     <video
       ref={videoRef}
+      data-edit-id="home-hero-video"
+      data-edit-kind="video"
       className="hero-video absolute inset-0 z-0 h-full w-full object-cover"
       poster={poster}
       autoPlay
@@ -1280,11 +1338,20 @@ function BackgroundVideo({ src, poster }: { src: string; poster: string }) {
   )
 }
 
-function SectionHeader({ title, body, titleClassName }: { title: string; body: string; titleClassName?: string }) {
+function SectionHeader({ id, title, body, titleClassName }: { id?: string; title: string; body: string; titleClassName?: string }) {
+  const site = useSite()
+  const titleBlock = id ? site.override(`${id}-title`) : undefined
+  const bodyBlock = id ? site.override(`${id}-body`) : undefined
+  if (id && (titleBlock?.hidden || bodyBlock?.hidden) && !site.editing) return null
   return (
-    <div className="reveal max-w-3xl">
-      <h2 className={`section-title ${titleClassName ?? ''}`}>{title}</h2>
-      <p className="mt-4 text-base leading-7 text-white/62 sm:text-lg">{body}</p>
+    <div className="reveal max-w-3xl" data-layout-root={id} style={layoutRootStyle(id ? site.override(`root-${id}`)?.height : undefined, Boolean(id) && site.showPlacement && site.override(`root-${id}`)?.height != null)}>
+      {id && <LayoutGuides group={id} />}
+      <h2 className={`section-title ${titleClassName ?? ''}`} data-edit-id={id ? `${id}-title` : undefined} data-edit-kind={id ? 'text' : undefined} style={blockStyle(titleBlock)}>
+        {id ? <TextBind id={`${id}-title`} group={id} fallback={title} /> : title}
+      </h2>
+      <p className="mt-4 text-base leading-7 text-white/62 sm:text-lg" data-edit-id={id ? `${id}-body` : undefined} data-edit-kind={id ? 'text' : undefined} style={blockStyle(bodyBlock)}>
+        {id ? <TextBind id={`${id}-body`} group={id} fallback={body} /> : body}
+      </p>
     </div>
   )
 }
@@ -1337,7 +1404,7 @@ function SectionMotionLayer({ image, variant }: { image: string; variant: 'film'
   )
 }
 
-function SourceMosaic({ label, title, body, images }: { label: string; title: string; body: string; images: string[] }) {
+function SourceMosaic({ editId = 'mosaic', label, title, body, images }: { editId?: string; label: string; title: string; body: string; images: string[] }) {
   return (
     <div
       className="reveal source-mosaic spotlight-surface"
@@ -1351,14 +1418,21 @@ function SourceMosaic({ label, title, body, images }: { label: string; title: st
       </div>
       <div className="source-mosaic-grid" aria-hidden="true">
         {images.slice(0, 6).map((image, index) => (
-          <img src={image} alt="" loading="lazy" key={`${image}-${index}`} />
+          <img data-edit-id={`${editId}-img-${index}`} data-edit-kind="image" src={image} alt="" loading="lazy" draggable={false} key={`${image}-${index}`} />
         ))}
       </div>
     </div>
   )
 }
 
-function WorkCard({ item, index, onOpen }: { item: WorkItem; index: number; onOpen?: () => void }) {
+function WorkCard({ item, index, onOpen, blockId, group }: { item: WorkItem; index: number; onOpen?: () => void; blockId: string; group: string }) {
+  const site = useSite()
+  const block = site.override(blockId)
+  if (block?.hidden && !site.editing) return null
+  const title = block?.text ?? item.title
+  const role = block?.extra ?? item.role
+  const detail = block?.detail ?? item.detail
+  const editing = site.editing && site.unlocked
   const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (!onOpen) return
     if (event.key === 'Enter' || event.key === ' ') {
@@ -1369,11 +1443,19 @@ function WorkCard({ item, index, onOpen }: { item: WorkItem; index: number; onOp
 
   return (
     <article
-      className={`reveal work-card spotlight-surface ${onOpen ? 'is-clickable' : ''}`}
-      style={{ transitionDelay: `${index * 55}ms` }}
-      role={onOpen ? 'button' : undefined}
-      tabIndex={onOpen ? 0 : undefined}
-      onClick={onOpen}
+      className={`reveal work-card spotlight-surface ${onOpen && !editing ? 'is-clickable' : ''} ${editing ? 'edit-block' : ''} ${placementStyle(block, site.showPlacement) ? 'is-placed' : ''} ${site.selected.includes(blockId) ? 'is-selected' : ''} ${site.guideId === blockId ? 'is-guide' : ''} ${block?.hidden ? 'is-hidden-block' : ''}`}
+      style={{ transitionDelay: `${index * 55}ms`, order: block?.order ?? index, ...placementStyle(block, site.showPlacement), ...(site.selected.includes(blockId) ? { zIndex: 8 } : {}) }}
+      role={onOpen && !editing ? 'button' : undefined}
+      tabIndex={onOpen && !editing ? 0 : undefined}
+      data-block-id={editing || placementStyle(block, site.showPlacement) ? blockId : undefined}
+      data-group={editing || placementStyle(block, site.showPlacement) ? group : undefined}
+      data-order={block?.order ?? index}
+      data-x={block?.x}
+      data-y={block?.y}
+      data-width={block?.width}
+      data-height={block?.height}
+      onClick={editing ? undefined : onOpen}
+      onPointerDown={editing ? (event) => site.pointerDown(event, { id: blockId, group, order: block?.order ?? index }) : undefined}
       onKeyDown={handleKeyDown}
       onPointerMove={handleInteractivePointerMove}
       onPointerLeave={handleInteractivePointerLeave}
@@ -1381,7 +1463,7 @@ function WorkCard({ item, index, onOpen }: { item: WorkItem; index: number; onOp
       {item.assets && (
         <div className="work-card-assets">
           {item.assets.slice(0, 4).map((asset, assetIndex) => (
-            <img src={asset} alt={`${item.title} 素材 ${assetIndex + 1}`} loading="lazy" key={asset} />
+            <img data-edit-id={`${blockId}-img-${assetIndex}`} data-edit-kind="image" src={asset} alt={`${title} 素材 ${assetIndex + 1}`} loading="lazy" draggable={false} key={asset} />
           ))}
         </div>
       )}
@@ -1389,13 +1471,25 @@ function WorkCard({ item, index, onOpen }: { item: WorkItem; index: number; onOp
         <Sparkles size={19} className="text-[var(--accent)]" />
         <span className="text-xs text-white/42">SOURCE MATERIALS</span>
       </div>
-      <h3>{item.title}</h3>
-      <p className="role">{item.role}</p>
-      <p className="detail">{item.detail}</p>
-      {onOpen && (
+      <h3 data-edit-id={`${blockId}-title`} data-edit-kind="text" style={blockStyle(block)}>{title}</h3>
+      <p className="role">{role}</p>
+      <p className="detail">{detail}</p>
+      {onOpen && !editing && (
         <span className="work-card-action">
           查看项目资料 <ArrowRight size={16} />
         </span>
+      )}
+      {editing && site.layoutMode && site.selected.includes(blockId) && (
+        <button
+          type="button"
+          className="edit-resize"
+          aria-label="拖动调整大小"
+          onPointerDownCapture={(event) => {
+            event.stopPropagation()
+            event.preventDefault()
+            site.startResize(event, blockId)
+          }}
+        />
       )}
     </article>
   )

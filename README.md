@@ -39,4 +39,14 @@ git lfs pull
 
 ## Environment
 
-No real secrets are required for the current site. Use `.env.example` as the template if future public Vite variables are added.
+No real secrets are required for the public pages. Use `.env.example` as the template. The private canvas does not work until the server has both `EDITOR_ACCESS_TOKEN` and a durable store. Leaving them empty makes `/api/editor` reject draft reads and every write.
+
+## Private canvas
+
+`/editor` is a private editing page. Knowing the address is not access. The browser asks for a credential and sends it only to the server; the comparison uses `EDITOR_ACCESS_TOKEN`, which is never written into the page bundle. Drafts are stored by the server, not in `localStorage`. Publish is a separate action. Until that action, `/board` stays empty and the existing seven pages are unchanged.
+
+The drag, snap, grid, and multi-select alignment behavior is adapted from the owner's ejected CanvasArt project, Base44 app id `6ab7badc6b3c55bfd9a45edd`, specifically the algorithms in `snapUtils.js` and `autoLayoutUtils.js`. The source was the owner's own ejected project. This site does not import `@base44/sdk` or `@base44/vite-plugin`, and it does not copy the CanvasArt login, AI, or Google Drive code. No new third-party editor library was added. `lucide-react`, already used by this site, stays under its existing license. Cloud drafts use `@vercel/blob` against a private store. The exact variables are in `docs/editor-storage.md`.
+
+On a local server, `EDITOR_STORE=file` with `EDITOR_STORE_DIR` pointing outside the repository can persist drafts and uploads on disk. That mode is refused when `VERCEL=1`, because a function's disk is not durable storage. This Vercel project currently has no editor token and no blob, database, or key-value store, so the hosted preview fails closed. The checked Supabase project belongs to a different product and is not used.
+
+Text formatting here applies to a whole text box. CanvasArt's per-selection HTML spans were not ported. Desktop `/board` keeps each element's relative position. Narrow `/board` restacks by vertical order instead of reusing desktop pixel coordinates.
