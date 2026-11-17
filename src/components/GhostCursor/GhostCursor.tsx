@@ -224,15 +224,21 @@ export default function GhostCursor({
     const prevParentPosition = parent.style.position
     if (!prevParentPosition || prevParentPosition === 'static') parent.style.position = 'relative'
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: !isTouch,
-      alpha: true,
-      depth: false,
-      stencil: false,
-      powerPreference: isTouch ? 'low-power' : 'high-performance',
-      premultipliedAlpha: false,
-      preserveDrawingBuffer: false,
-    })
+    let renderer
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: !isTouch,
+        alpha: true,
+        depth: false,
+        stencil: false,
+        powerPreference: isTouch ? 'low-power' : 'high-performance',
+        premultipliedAlpha: false,
+        preserveDrawingBuffer: false,
+      })
+    } catch {
+      if (!prevParentPosition || prevParentPosition === 'static') parent.style.position = prevParentPosition
+      return
+    }
     renderer.setClearColor(0x000000, 0)
     renderer.domElement.style.pointerEvents = 'none'
     if (mixBlendMode) renderer.domElement.style.mixBlendMode = String(mixBlendMode)

@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unknown-property */
 // @ts-nocheck
 import { Environment, Lightformer, useGLTF, useTexture } from '@react-three/drei'
+import { Component, type ReactNode } from 'react'
 import { Canvas, extend, useFrame } from '@react-three/fiber'
 import {
   BallCollider,
@@ -58,6 +59,7 @@ export default function Lanyard({
 
   return (
     <div className="lanyard-wrapper">
+      <WebGLBoundary>
       <Canvas
         camera={{ position, fov }}
         dpr={[1.5, isMobile ? 2 : 2.75]}
@@ -82,8 +84,22 @@ export default function Lanyard({
           <Lightformer intensity={8} color="#fff4ed" position={[-10, 0, 14]} rotation={[0, Math.PI / 2, Math.PI / 3]} scale={[100, 10, 1]} />
         </Environment>
       </Canvas>
+      </WebGLBoundary>
     </div>
   )
+}
+
+class WebGLBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  render() {
+    if (this.state.failed) return null
+    return this.props.children
+  }
 }
 
 function Band({
